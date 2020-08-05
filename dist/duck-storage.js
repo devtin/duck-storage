@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.1
+ * duck-storage v0.0.3
  * (c) 2020 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -240,14 +240,57 @@ ObjectID.prototype[inspect] = function() { return "ObjectID("+this+")" };
 ObjectID.prototype.toJSON = ObjectID.prototype.toHexString;
 ObjectID.prototype.toString = ObjectID.prototype.toHexString;
 
+function loadReference ({ DuckStorage, duckRack }) {
+  async function loadReferences (entry) {
+    const entriesToLoad = this.duckModel
+      .schema
+      .paths
+      .filter((path) => {
+        return this.duckModel.schema.schemaAtPath(path).settings.duckRack && schemaValidator.Utils.find(entry, path)
+      })
+      .map(path => {
+        const Rack = DuckStorage.getRackByName(this.duckModel.schema.schemaAtPath(path).settings.duckRack);
+        const _idPayload = schemaValidator.Utils.find(entry, path);
+        const _id = Rack.duckModel.schema.isValid(_idPayload) ? _idPayload._id : _idPayload;
+        return { duckRack: this.duckModel.schema.schemaAtPath(path).settings.duckRack, _id, path }
+      });
+
+    for (const entryToLoad of entriesToLoad) {
+      set(entry, entryToLoad.path, await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id));
+    }
+
+    return entry
+  }
+
+  duckRack.hook('after', 'read', loadReferences);
+  duckRack.hook('after', 'create', loadReferences);
+}
+
 const store = Object.create(null);
+const plugins = [loadReference];
 const DuckStorage = {
+  plugin (fn) {
+    plugins.push(fn);
+  },
   registerRack (duckRack) {
     if (store[duckRack.name]) {
       throw new Error(`a DuckRack with the name ${duckRack.name} is already registered`)
     }
 
     store[duckRack.name] = duckRack;
+    plugins.forEach(fn => {
+      fn({ DuckStorage, duckRack });
+    });
+  },
+  removeRack (rackName) {
+    if (!store[rackName]) {
+      throw new Error(`a DuckRack with the name ${rackName} could not be found`)
+    }
+
+    delete store[rackName];
+  },
+  listRacks () {
+    return Object.keys(store)
   },
   getRackByName (rackName) {
     return store[rackName]
@@ -533,7 +576,7 @@ class DuckRack extends events.EventEmitter {
 
     const $this = this;
 
-    DuckStorage.registerRack(this);
+    // DuckStorage.registerRack(this)
 
     return new Proxy(this, {
       get (target, key) {
@@ -637,6 +680,7 @@ class DuckRack extends events.EventEmitter {
       await this.trigger('before', 'update', { oldEntry, newEntry, entry });
       this.emit('update', { oldEntry: Object.assign({}, oldEntry), newEntry, entry });
       Object.assign(oldEntry, entry);
+      await this.trigger('after', 'update', { oldEntry, newEntry, entry });
     }
 
     return entries

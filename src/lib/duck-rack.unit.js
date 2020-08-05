@@ -267,6 +267,9 @@ test('loads references of ducks in other racks', async t => {
     duckModel: CustomerModel
   })
 
+  DuckStorage.registerRack(OrderRack)
+  DuckStorage.registerRack(CustomerRack)
+
   const customer = await CustomerBucket.create({
     firstName: 'Martin',
     lastName: 'Rafael',

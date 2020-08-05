@@ -62,7 +62,7 @@ export class DuckRack extends EventEmitter {
 
     const $this = this
 
-    DuckStorage.registerRack(this)
+    // DuckStorage.registerRack(this)
 
     return new Proxy(this, {
       get (target, key) {

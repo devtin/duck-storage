@@ -166,6 +166,7 @@ export class DuckRack extends EventEmitter {
       await this.trigger('before', 'update', { oldEntry, newEntry, entry })
       this.emit('update', { oldEntry: Object.assign({}, oldEntry), newEntry, entry })
       Object.assign(oldEntry, entry)
+      await this.trigger('after', 'update', { oldEntry, newEntry, entry })
     }
 
     return entries

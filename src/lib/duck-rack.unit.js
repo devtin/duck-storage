@@ -1,8 +1,7 @@
 import { Duck } from './duck'
 import { DuckRack } from './duck-rack'
-import { Schema, Utils } from '@devtin/schema-validator'
+import { Schema } from '@devtin/schema-validator'
 import test from 'ava'
-import set from 'lodash/set'
 import { DuckStorage } from './duck-storage'
 
 const Address = new Schema({

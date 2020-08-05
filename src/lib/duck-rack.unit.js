@@ -230,46 +230,18 @@ test('loads references of ducks in other racks', async t => {
   const OrderModel = new Duck({ schema: orderSchema })
   const CustomerModel = new Duck({ schema: customerSchema })
 
-  const OrderBucket = new DuckRack('order', {
+  const OrderRack = new DuckRack('order', {
     duckModel: OrderModel
   })
 
-  OrderBucket.hook('before', 'create', function (entry) {
-    return entry
-  })
-
-  async function loadReferences (entry) {
-    const entriesToLoad = this.duckModel
-      .schema
-      .paths
-      .filter((path) => {
-        return this.duckModel.schema.schemaAtPath(path).settings.duckRack && Utils.find(entry, path)
-      })
-      .map(path => {
-        const Rack = DuckStorage.getRackByName(this.duckModel.schema.schemaAtPath(path).settings.duckRack)
-        const _idPayload = Utils.find(entry, path)
-        const _id = Rack.duckModel.schema.isValid(_idPayload) ? _idPayload._id : _idPayload
-        return { duckRack: this.duckModel.schema.schemaAtPath(path).settings.duckRack, _id, path }
-      })
-
-    for (const entryToLoad of entriesToLoad) {
-      set(entry, entryToLoad.path, await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id))
-    }
-
-    return entry
-  }
-
-  OrderBucket.hook('after', 'read', loadReferences)
-  OrderBucket.hook('after', 'create', loadReferences)
-
-  const CustomerBucket = new DuckRack('customer', {
+  const CustomerRack = new DuckRack('customer', {
     duckModel: CustomerModel
   })
 
   DuckStorage.registerRack(OrderRack)
   DuckStorage.registerRack(CustomerRack)
 
-  const customer = await CustomerBucket.create({
+  const customer = await CustomerRack.create({
     firstName: 'Martin',
     lastName: 'Rafael',
     email: 'tin@devtin.io'
@@ -290,14 +262,14 @@ test('loads references of ducks in other racks', async t => {
     throw err
   }
 
-  const order = await OrderBucket.create({
+  const order = await OrderRack.create({
     customer,
     amount: 100
   })
 
   t.deepEqual(order.customer, customer.consolidate())
 
-  const readOrder = await OrderBucket.read(order._id)
+  const readOrder = await OrderRack.read(order._id)
   t.deepEqual(readOrder.customer, customer.consolidate())
 })
 

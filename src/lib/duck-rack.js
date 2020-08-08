@@ -8,7 +8,6 @@ import './types/object-id.js'
 import './types/uuid.js'
 import './types/query.js'
 import { Methods } from './schemas/method.js'
-import { DuckStorage } from './duck-storage'
 import { Hooks } from './hooks'
 
 class DuckRackError extends Error {

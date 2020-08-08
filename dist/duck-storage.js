@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.3
+ * duck-storage v0.0.5
  * (c) 2020 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -9,12 +9,69 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-var events = require('events');
 var schemaValidator = require('@devtin/schema-validator');
+var set = _interopDefault(require('lodash/set'));
+var events = require('events');
 var sift = _interopDefault(require('sift'));
 var camelCase = _interopDefault(require('lodash/camelCase'));
 var kebabCase = _interopDefault(require('lodash/kebabCase'));
-var set = _interopDefault(require('lodash/set'));
+
+function loadReference ({ DuckStorage, duckRack }) {
+  async function loadReferences (entry) {
+    const entriesToLoad = this.duckModel
+      .schema
+      .paths
+      .filter((path) => {
+        return this.duckModel.schema.schemaAtPath(path).settings.duckRack && schemaValidator.Utils.find(entry, path)
+      })
+      .map(path => {
+        const Rack = DuckStorage.getRackByName(this.duckModel.schema.schemaAtPath(path).settings.duckRack);
+        const _idPayload = schemaValidator.Utils.find(entry, path);
+        const _id = Rack.duckModel.schema.isValid(_idPayload) ? _idPayload._id : _idPayload;
+        return { duckRack: this.duckModel.schema.schemaAtPath(path).settings.duckRack, _id, path }
+      });
+
+    for (const entryToLoad of entriesToLoad) {
+      set(entry, entryToLoad.path, await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id));
+    }
+
+    return entry
+  }
+
+  duckRack.hook('after', 'read', loadReferences);
+  duckRack.hook('after', 'create', loadReferences);
+}
+
+const store = Object.create(null);
+const plugins = [loadReference];
+const DuckStorage = {
+  plugin (fn) {
+    plugins.push(fn);
+  },
+  registerRack (duckRack) {
+    if (store[duckRack.name]) {
+      throw new Error(`a DuckRack with the name ${duckRack.name} is already registered`)
+    }
+
+    store[duckRack.name] = duckRack;
+    plugins.forEach(fn => {
+      fn({ DuckStorage, duckRack });
+    });
+  },
+  removeRack (rackName) {
+    if (!store[rackName]) {
+      throw new Error(`a DuckRack with the name ${rackName} could not be found`)
+    }
+
+    delete store[rackName];
+  },
+  listRacks () {
+    return Object.keys(store)
+  },
+  getRackByName (rackName) {
+    return store[rackName]
+  }
+};
 
 var MACHINE_ID = Math.floor(Math.random() * 0xFFFFFF);
 var index = ObjectID.index = parseInt(Math.random() * 0xFFFFFF, 10);
@@ -239,63 +296,6 @@ var inspect = (Symbol && Symbol.for('nodejs.util.inspect.custom')) || 'inspect';
 ObjectID.prototype[inspect] = function() { return "ObjectID("+this+")" };
 ObjectID.prototype.toJSON = ObjectID.prototype.toHexString;
 ObjectID.prototype.toString = ObjectID.prototype.toHexString;
-
-function loadReference ({ DuckStorage, duckRack }) {
-  async function loadReferences (entry) {
-    const entriesToLoad = this.duckModel
-      .schema
-      .paths
-      .filter((path) => {
-        return this.duckModel.schema.schemaAtPath(path).settings.duckRack && schemaValidator.Utils.find(entry, path)
-      })
-      .map(path => {
-        const Rack = DuckStorage.getRackByName(this.duckModel.schema.schemaAtPath(path).settings.duckRack);
-        const _idPayload = schemaValidator.Utils.find(entry, path);
-        const _id = Rack.duckModel.schema.isValid(_idPayload) ? _idPayload._id : _idPayload;
-        return { duckRack: this.duckModel.schema.schemaAtPath(path).settings.duckRack, _id, path }
-      });
-
-    for (const entryToLoad of entriesToLoad) {
-      set(entry, entryToLoad.path, await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id));
-    }
-
-    return entry
-  }
-
-  duckRack.hook('after', 'read', loadReferences);
-  duckRack.hook('after', 'create', loadReferences);
-}
-
-const store = Object.create(null);
-const plugins = [loadReference];
-const DuckStorage = {
-  plugin (fn) {
-    plugins.push(fn);
-  },
-  registerRack (duckRack) {
-    if (store[duckRack.name]) {
-      throw new Error(`a DuckRack with the name ${duckRack.name} is already registered`)
-    }
-
-    store[duckRack.name] = duckRack;
-    plugins.forEach(fn => {
-      fn({ DuckStorage, duckRack });
-    });
-  },
-  removeRack (rackName) {
-    if (!store[rackName]) {
-      throw new Error(`a DuckRack with the name ${rackName} could not be found`)
-    }
-
-    delete store[rackName];
-  },
-  listRacks () {
-    return Object.keys(store)
-  },
-  getRackByName (rackName) {
-    return store[rackName]
-  }
-};
 
 schemaValidator.Transformers.ObjectId = {
   parse (v, { state }) {
@@ -1088,3 +1088,4 @@ class Duck extends events.EventEmitter {
 exports.Duckfficer = schemaValidator;
 exports.Duck = Duck;
 exports.DuckRack = DuckRack;
+exports.DuckStorage = DuckStorage;

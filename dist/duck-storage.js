@@ -42,36 +42,84 @@ function loadReference ({ DuckStorage, duckRack }) {
   duckRack.hook('after', 'create', loadReferences);
 }
 
-const store = Object.create(null);
-const plugins = [loadReference];
-const DuckStorage = {
+class DuckStorageClass extends events.EventEmitter {
+  constructor () {
+    super();
+    this.store = Object.create(null);
+    this.plugins = [loadReference];
+  }
+
+  _wireRack (rack) {
+    rack.on('create', (payload) => {
+      this.emit('create', {
+        entityName: rack.name,
+        payload
+      });
+    });
+    rack.on('read', (payload) => {
+      this.emit('read', {
+        entityName: rack.name,
+        payload
+      });
+    });
+    rack.on('update', (payload) => {
+      this.emit('update', {
+        entityName: rack.name,
+        payload
+      });
+    });
+    rack.on('delete', (payload) => {
+      this.emit('delete', {
+        entityName: rack.name,
+        payload
+      });
+    });
+    rack.on('list', (payload) => {
+      this.emit('list', {
+        entityName: rack.name,
+        payload
+      });
+    });
+  }
+
+  init () {
+
+  }
+
   plugin (fn) {
-    plugins.push(fn);
-  },
+    this.plugins.push(fn);
+  }
+
   registerRack (duckRack) {
-    if (store[duckRack.name]) {
+    if (this.store[duckRack.name]) {
       throw new Error(`a DuckRack with the name ${duckRack.name} is already registered`)
     }
 
-    store[duckRack.name] = duckRack;
-    plugins.forEach(fn => {
+    this.store[duckRack.name] = duckRack;
+    this.plugins.forEach(fn => {
       fn({ DuckStorage, duckRack });
     });
-  },
+    this._wireRack(duckRack);
+  }
+
   removeRack (rackName) {
-    if (!store[rackName]) {
+    if (!this.store[rackName]) {
       throw new Error(`a DuckRack with the name ${rackName} could not be found`)
     }
 
-    delete store[rackName];
-  },
-  listRacks () {
-    return Object.keys(store)
-  },
-  getRackByName (rackName) {
-    return store[rackName]
+    delete this.store[rackName];
   }
-};
+
+  listRacks () {
+    return Object.keys(this.store)
+  }
+
+  getRackByName (rackName) {
+    return this.store[rackName]
+  }
+}
+
+const DuckStorage = new DuckStorageClass();
 
 var MACHINE_ID = Math.floor(Math.random() * 0xFFFFFF);
 var index = ObjectID.index = parseInt(Math.random() * 0xFFFFFF, 10);
@@ -624,6 +672,17 @@ class DuckRack extends events.EventEmitter {
     return entity.filter(sift(query))
   }
 
+  /**
+   * @event DuckRack#create
+   * @type {Object} - the duck
+   */
+
+  /**
+   * @param newEntry
+   * @return {Promise<*>}
+   * @fires {DuckRack#create}
+   */
+
   async create (newEntry = {}) {
     newEntry = await this.trigger('before', 'create', newEntry);
 
@@ -657,10 +716,23 @@ class DuckRack extends events.EventEmitter {
   async read (_id) {
     const entry = await this.findOneById(_id);
     if (entry) {
-      const entryModel = this.duckModel.getModel(Object.assign({}, entry));
+      const entryModel = this.duckModel.getModel(Object.assign({}, await this.trigger('before', 'read', entry)));
       return this.trigger('after', 'read', entryModel)
     }
   }
+
+  /**
+   * @event DuckRack#update
+   * @type {Object}
+   * @property {Object} oldEntry - the entry as it was in previous state
+   * @property {Object} newEntry - received patching object
+   * @property {Object} entry - the resulting object
+   */
+
+  /**
+   * Updates ducks matching given `query` with given `newEntry`
+   * @fires {DuckRack#update}
+   */
 
   async update (query, newEntry) {
     const entries = (await DuckRack.find(this.store, query)).map(oldEntry => {
@@ -685,6 +757,19 @@ class DuckRack extends events.EventEmitter {
 
     return entries
   }
+
+  /**
+   * @event DuckRack#delete
+   * @type {Object}
+   * @property {Object} oldEntry - the entry as it was in previous state
+   * @property {Object} newEntry - received patching object
+   * @property {Object} entry - the resulting object
+   */
+
+  /**
+   * Deletes ducks matching given `query`
+   * @fires {DuckRack#delete}
+   */
 
   async delete (query) {
     const entity = this.store;

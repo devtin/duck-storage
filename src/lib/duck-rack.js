@@ -109,6 +109,17 @@ export class DuckRack extends EventEmitter {
     return entity.filter(sift(query))
   }
 
+  /**
+   * @event DuckRack#create
+   * @type {Object} - the duck
+   */
+
+  /**
+   * @param newEntry
+   * @return {Promise<*>}
+   * @fires {DuckRack#create}
+   */
+
   async create (newEntry = {}) {
     newEntry = await this.trigger('before', 'create', newEntry)
 
@@ -142,10 +153,23 @@ export class DuckRack extends EventEmitter {
   async read (_id) {
     const entry = await this.findOneById(_id)
     if (entry) {
-      const entryModel = this.duckModel.getModel(Object.assign({}, entry))
+      const entryModel = this.duckModel.getModel(Object.assign({}, await this.trigger('before', 'read', entry)))
       return this.trigger('after', 'read', entryModel)
     }
   }
+
+  /**
+   * @event DuckRack#update
+   * @type {Object}
+   * @property {Object} oldEntry - the entry as it was in previous state
+   * @property {Object} newEntry - received patching object
+   * @property {Object} entry - the resulting object
+   */
+
+  /**
+   * Updates ducks matching given `query` with given `newEntry`
+   * @fires {DuckRack#update}
+   */
 
   async update (query, newEntry) {
     const entries = (await DuckRack.find(this.store, query)).map(oldEntry => {
@@ -170,6 +194,19 @@ export class DuckRack extends EventEmitter {
 
     return entries
   }
+
+  /**
+   * @event DuckRack#delete
+   * @type {Object}
+   * @property {Object} oldEntry - the entry as it was in previous state
+   * @property {Object} newEntry - received patching object
+   * @property {Object} entry - the resulting object
+   */
+
+  /**
+   * Deletes ducks matching given `query`
+   * @fires {DuckRack#delete}
+   */
 
   async delete (query) {
     const entity = this.store

@@ -15,6 +15,7 @@ var events = require('events');
 var sift = _interopDefault(require('sift'));
 var camelCase = _interopDefault(require('lodash/camelCase'));
 var kebabCase = _interopDefault(require('lodash/kebabCase'));
+var jsDirIntoJson = require('js-dir-into-json');
 
 function loadReference ({ DuckStorage, duckRack }) {
   async function loadReferences (entry) {
@@ -1170,7 +1171,18 @@ class Duck extends events.EventEmitter {
   }
 }
 
+async function registerDuckRacksFromDir (directory) {
+  const racks = await jsDirIntoJson.jsDirIntoJson(directory);
+  Object.keys(racks).forEach((rackName) => {
+    const duckModelSchema = racks[rackName];
+    const duckRack = new DuckRack(rackName, { duckModel: new Duck(duckModelSchema) });
+    DuckStorage.registerRack(duckRack);
+  });
+  return racks
+}
+
 exports.Duckfficer = schemaValidator;
 exports.Duck = Duck;
 exports.DuckRack = DuckRack;
 exports.DuckStorage = DuckStorage;
+exports.registerDuckRacksFromDir = registerDuckRacksFromDir;

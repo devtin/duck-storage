@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.7](https://github.com/devtin/duck-storage/compare/v0.0.6...v0.0.7) (2020-08-09)
+
+
+### Features
+
+* export registerDuckRacksFromDir ([906e681](https://github.com/devtin/duck-storage/commit/906e6814d1c1a877212272243eab0346a0de38b7))
+
 ### [0.0.6](https://github.com/devtin/duck-storage/compare/v0.0.5...v0.0.6) (2020-08-09)
 
 

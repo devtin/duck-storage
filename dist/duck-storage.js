@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.7
+ * duck-storage v0.0.8
  * (c) 2020 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -15,6 +15,7 @@ var events = require('events');
 var sift = _interopDefault(require('sift'));
 var camelCase = _interopDefault(require('lodash/camelCase'));
 var kebabCase = _interopDefault(require('lodash/kebabCase'));
+var deepObjectDiff = require('deep-object-diff');
 var jsDirIntoJson = require('js-dir-into-json');
 
 function loadReference ({ DuckStorage, duckRack }) {
@@ -42,85 +43,6 @@ function loadReference ({ DuckStorage, duckRack }) {
   duckRack.hook('after', 'read', loadReferences);
   duckRack.hook('after', 'create', loadReferences);
 }
-
-class DuckStorageClass extends events.EventEmitter {
-  constructor () {
-    super();
-    this.store = Object.create(null);
-    this.plugins = [loadReference];
-  }
-
-  _wireRack (rack) {
-    rack.on('create', (payload) => {
-      this.emit('create', {
-        entityName: rack.name,
-        payload
-      });
-    });
-    rack.on('read', (payload) => {
-      this.emit('read', {
-        entityName: rack.name,
-        payload
-      });
-    });
-    rack.on('update', (payload) => {
-      this.emit('update', {
-        entityName: rack.name,
-        payload
-      });
-    });
-    rack.on('delete', (payload) => {
-      this.emit('delete', {
-        entityName: rack.name,
-        payload
-      });
-    });
-    rack.on('list', (payload) => {
-      this.emit('list', {
-        entityName: rack.name,
-        payload
-      });
-    });
-  }
-
-  init () {
-
-  }
-
-  plugin (fn) {
-    this.plugins.push(fn);
-  }
-
-  registerRack (duckRack) {
-    if (this.store[duckRack.name]) {
-      throw new Error(`a DuckRack with the name ${duckRack.name} is already registered`)
-    }
-
-    this.store[duckRack.name] = duckRack;
-    this.plugins.forEach(fn => {
-      fn({ DuckStorage, duckRack });
-    });
-    this._wireRack(duckRack);
-  }
-
-  removeRack (rackName) {
-    if (!this.store[rackName]) {
-      throw new Error(`a DuckRack with the name ${rackName} could not be found`)
-    }
-
-    delete this.store[rackName];
-  }
-
-  listRacks () {
-    return Object.keys(this.store)
-  }
-
-  getRackByName (rackName) {
-    return this.store[rackName]
-  }
-}
-
-const DuckStorage = new DuckStorageClass();
 
 var MACHINE_ID = Math.floor(Math.random() * 0xFFFFFF);
 var index = ObjectID.index = parseInt(Math.random() * 0xFFFFFF, 10);
@@ -507,6 +429,10 @@ const SchemaType = new schemaValidator.Schema({
 });
 
 const Meth = new schemaValidator.Schema({
+  description: {
+    type: String,
+    required: false
+  },
   input: {
     type: SchemaType,
     required: false
@@ -524,6 +450,11 @@ const Meth = new schemaValidator.Schema({
       }
     }
     return v
+  },
+  parse (v) {
+    if (!v.description && v.handler.name) {
+      v.description = `methood ${v.handler.name}`;
+    }
   }
 });
 
@@ -738,7 +669,7 @@ class DuckRack extends events.EventEmitter {
   async update (query, newEntry) {
     const entries = (await DuckRack.find(this.store, query)).map(oldEntry => {
       if (newEntry && newEntry._id && oldEntry._id !== newEntry._id) {
-        throw new Error('_id\'s can not be modified')
+        throw new Error('_id\'s cannot be modified')
       }
 
       if (newEntry._v && newEntry._v !== oldEntry._v) {
@@ -749,7 +680,14 @@ class DuckRack extends events.EventEmitter {
     });
 
     for (const oldEntry of entries) {
-      const entry = Object.assign({}, oldEntry, newEntry, { _v: oldEntry._v + 1 });
+      const entry = Object.assign({}, oldEntry, newEntry);
+
+      if (Object.keys(deepObjectDiff.updatedDiff(oldEntry, entry)).length === 0) {
+        continue
+      }
+
+      entry._v = oldEntry._v + 1;
+
       await this.trigger('before', 'update', { oldEntry, newEntry, entry });
       this.emit('update', { oldEntry: Object.assign({}, oldEntry), newEntry, entry });
       Object.assign(oldEntry, entry);
@@ -860,6 +798,91 @@ class DuckRack extends events.EventEmitter {
     }
   }
 }
+
+class DuckStorageClass extends events.EventEmitter {
+  constructor () {
+    super();
+    this.store = Object.create(null);
+    this.plugins = [loadReference];
+  }
+
+  _wireRack (rack) {
+    rack.on('create', (payload) => {
+      this.emit('create', {
+        entityName: rack.name,
+        payload
+      });
+    });
+    rack.on('read', (payload) => {
+      this.emit('read', {
+        entityName: rack.name,
+        payload
+      });
+    });
+    rack.on('update', (payload) => {
+      this.emit('update', {
+        entityName: rack.name,
+        payload
+      });
+    });
+    rack.on('delete', (payload) => {
+      this.emit('delete', {
+        entityName: rack.name,
+        payload
+      });
+    });
+    rack.on('list', (payload) => {
+      this.emit('list', {
+        entityName: rack.name,
+        payload
+      });
+    });
+  }
+
+  init (name, model, { methods, events } = {}) {
+    const duckRack = new DuckRack(name, {
+      duckModel: model,
+      methods,
+      events
+    });
+    this.registerRack(duckRack);
+    return duckRack
+  }
+
+  plugin (fn) {
+    this.plugins.push(fn);
+  }
+
+  registerRack (duckRack) {
+    if (this.store[duckRack.name]) {
+      throw new Error(`a DuckRack with the name ${duckRack.name} is already registered`)
+    }
+
+    this.store[duckRack.name] = duckRack;
+    this.plugins.forEach(fn => {
+      fn({ DuckStorage, duckRack });
+    });
+    this._wireRack(duckRack);
+  }
+
+  removeRack (rackName) {
+    if (!this.store[rackName]) {
+      throw new Error(`a DuckRack with the name ${rackName} could not be found`)
+    }
+
+    delete this.store[rackName];
+  }
+
+  listRacks () {
+    return Object.keys(this.store)
+  }
+
+  getRackByName (rackName) {
+    return this.store[rackName]
+  }
+}
+
+const DuckStorage = new DuckStorageClass();
 
 function parsePath(text) {
   return text.split('.')
@@ -996,11 +1019,10 @@ class Duck extends events.EventEmitter {
     schema,
     idType = 'ObjectId',
     inlineParsing = true,
-    inlineStructureValidation = true,
-    methods = {}
+    inlineStructureValidation = true
   } = {}) {
     super();
-    const originalSchema = schema instanceof schemaValidator.Schema ? schema : new schemaValidator.Schema(schema);
+    const originalSchema = schemaValidator.Schema.ensureSchema(schema);
     this.originalSchema = originalSchema;
 
     schema = schemaValidator.Schema.cloneSchema({ schema: originalSchema });
@@ -1038,7 +1060,6 @@ class Duck extends events.EventEmitter {
     schema.children.unshift(_id, _v);
 
     this.schema = schema;
-    this.methods = methods;
     this.inlineParsing = inlineParsing;
     this.inlineStructureValidation = inlineStructureValidation;
     this.idType = idType;
@@ -1174,8 +1195,9 @@ class Duck extends events.EventEmitter {
 async function registerDuckRacksFromDir (directory) {
   const racks = await jsDirIntoJson.jsDirIntoJson(directory);
   Object.keys(racks).forEach((rackName) => {
-    const duckModelSchema = racks[rackName];
-    const duckRack = new DuckRack(rackName, { duckModel: new Duck(duckModelSchema) });
+    const { duckModel, methods } = racks[rackName];
+    const schema = new schemaValidator.Schema(duckModel.schema, { methods: duckModel.methods });
+    const duckRack = new DuckRack(rackName, { duckModel: new Duck({ schema }), methods });
     DuckStorage.registerRack(duckRack);
   });
   return racks

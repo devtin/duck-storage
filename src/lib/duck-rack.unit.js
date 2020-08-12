@@ -283,6 +283,7 @@ test('defines duck rack methods', async t => {
     duckModel: userDuckModel,
     methods: {
       changeLevel: {
+        description: 'What the method does',
         input: {
           userId: 'ObjectId',
           newLevel: String

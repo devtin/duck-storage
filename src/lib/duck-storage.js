@@ -1,5 +1,6 @@
 import loadReference from './plugins/load-reference'
 import { EventEmitter } from 'events'
+import { DuckRack } from './duck-rack'
 
 export class DuckStorageClass extends EventEmitter {
   constructor () {
@@ -41,8 +42,14 @@ export class DuckStorageClass extends EventEmitter {
     })
   }
 
-  init () {
-
+  init (name, model, { methods, events } = {}) {
+    const duckRack = new DuckRack(name, {
+      duckModel: model,
+      methods,
+      events
+    })
+    this.registerRack(duckRack)
+    return duckRack
   }
 
   plugin (fn) {

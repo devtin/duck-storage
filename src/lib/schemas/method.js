@@ -9,6 +9,10 @@ const SchemaType = new Schema({
 })
 
 export const Meth = new Schema({
+  description: {
+    type: String,
+    required: false
+  },
   input: {
     type: SchemaType,
     required: false
@@ -26,6 +30,11 @@ export const Meth = new Schema({
       }
     }
     return v
+  },
+  parse (v) {
+    if (!v.description && v.handler.name) {
+      v.description = `methood ${v.handler.name}`
+    }
   }
 })
 

@@ -32,11 +32,10 @@ export class Duck extends EventEmitter {
     schema,
     idType = 'ObjectId',
     inlineParsing = true,
-    inlineStructureValidation = true,
-    methods = {}
+    inlineStructureValidation = true
   } = {}) {
     super()
-    const originalSchema = schema instanceof Schema ? schema : new Schema(schema)
+    const originalSchema = Schema.ensureSchema(schema)
     this.originalSchema = originalSchema
 
     schema = Schema.cloneSchema({ schema: originalSchema })
@@ -74,7 +73,6 @@ export class Duck extends EventEmitter {
     schema.children.unshift(_id, _v)
 
     this.schema = schema
-    this.methods = methods
     this.inlineParsing = inlineParsing
     this.inlineStructureValidation = inlineStructureValidation
     this.idType = idType

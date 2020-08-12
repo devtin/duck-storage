@@ -52,6 +52,7 @@
   "dependencies": {
     "@devtin/schema-validator": "^3.5.1",
     "bson-objectid": "^1.3.1",
+    "deep-object-diff": "^1.1.0",
     "js-dir-into-json": "^2.1.0",
     "lodash": "^4.17.19",
     "sift": "^13.2.0"

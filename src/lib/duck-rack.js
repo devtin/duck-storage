@@ -3,6 +3,7 @@ import { Utils, Schema } from '@devtin/schema-validator'
 import sift from 'sift'
 import camelCase from 'lodash/camelCase'
 import kebabCase from 'lodash/kebabCase'
+import { updatedDiff } from 'deep-object-diff'
 
 import './types/object-id.js'
 import './types/uuid.js'
@@ -174,7 +175,7 @@ export class DuckRack extends EventEmitter {
   async update (query, newEntry) {
     const entries = (await DuckRack.find(this.store, query)).map(oldEntry => {
       if (newEntry && newEntry._id && oldEntry._id !== newEntry._id) {
-        throw new Error('_id\'s can not be modified')
+        throw new Error('_id\'s cannot be modified')
       }
 
       if (newEntry._v && newEntry._v !== oldEntry._v) {
@@ -185,7 +186,14 @@ export class DuckRack extends EventEmitter {
     })
 
     for (const oldEntry of entries) {
-      const entry = Object.assign({}, oldEntry, newEntry, { _v: oldEntry._v + 1 })
+      const entry = Object.assign({}, oldEntry, newEntry)
+
+      if (Object.keys(updatedDiff(oldEntry, entry)).length === 0) {
+        continue
+      }
+
+      entry._v = oldEntry._v + 1
+
       await this.trigger('before', 'update', { oldEntry, newEntry, entry })
       this.emit('update', { oldEntry: Object.assign({}, oldEntry), newEntry, entry })
       Object.assign(oldEntry, entry)

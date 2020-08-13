@@ -1,4 +1,6 @@
 import loadReference from './plugins/load-reference'
+import uniqueKeys from './plugins/unique-keys'
+import hashPasswords from './plugins/hash-password'
 import { EventEmitter } from 'events'
 import { DuckRack } from './duck-rack'
 
@@ -6,7 +8,7 @@ export class DuckStorageClass extends EventEmitter {
   constructor () {
     super()
     this.store = Object.create(null)
-    this.plugins = [loadReference]
+    this.plugins = [loadReference, uniqueKeys, hashPasswords]
   }
 
   _wireRack (rack) {
@@ -63,7 +65,7 @@ export class DuckStorageClass extends EventEmitter {
 
     this.store[duckRack.name] = duckRack
     this.plugins.forEach(fn => {
-      fn({ DuckStorage, duckRack })
+      fn({ DuckStorage: this, duckRack })
     })
     this._wireRack(duckRack)
   }

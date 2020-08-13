@@ -3,6 +3,9 @@ import ObjectId from 'bson-objectid'
 import { DuckStorage } from '../duck-storage'
 
 Transformers.ObjectId = {
+  settings: {
+    unique: true
+  },
   parse (v, { state }) {
     if (ObjectId.isValid(v)) {
       return ObjectId(v).toHexString()

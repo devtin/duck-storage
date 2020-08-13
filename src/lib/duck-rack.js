@@ -122,8 +122,6 @@ export class DuckRack extends EventEmitter {
    */
 
   async create (newEntry = {}) {
-    newEntry = await this.trigger('before', 'create', newEntry)
-
     if (typeof newEntry !== 'object' || newEntry === null || Array.isArray(newEntry)) {
       throw new Error('An entry must be provided')
     }
@@ -132,11 +130,16 @@ export class DuckRack extends EventEmitter {
 
     const { store, storeKey } = this
 
+    /*
     if (newEntry._id && await this.entryExists(newEntry._id)) {
       throw new Error(`Entry ${newEntry._id} already exists`)
     }
+*/
 
-    const entry = this.schema.parse(newEntry, { state: { method: 'create' } })
+    let entry = this.schema.parse(newEntry, { state: { method: 'create' } })
+
+    entry = await this.trigger('before', 'create', newEntry)
+
     storeKey[entry._id] = entry
     store.push(entry)
 
@@ -173,7 +176,7 @@ export class DuckRack extends EventEmitter {
    */
 
   async update (query, newEntry) {
-    const entries = (await DuckRack.find(this.store, query)).map(oldEntry => {
+    const entries = (await this.find(query)).map(oldEntry => {
       if (newEntry && newEntry._id && oldEntry._id !== newEntry._id) {
         throw new Error('_id\'s cannot be modified')
       }
@@ -253,7 +256,7 @@ export class DuckRack extends EventEmitter {
   }
 
   async list (query) {
-    return (query ? await DuckRack.find(this.store, query) : this.store).map(value => {
+    return (query ? await this.find(query) : this.store).map(value => {
       return this.duckModel.getModel(value)
     })
   }
@@ -277,7 +280,7 @@ export class DuckRack extends EventEmitter {
     return (await DuckRack.runQuery(this.store, Query.parse(queryInput)))[0]
   }
 
-  static async find (store, queryInput) {
+  async find (queryInput) {
     if (typeof queryInput !== 'object') {
       queryInput = {
         _id: {
@@ -286,7 +289,7 @@ export class DuckRack extends EventEmitter {
       }
     }
 
-    return DuckRack.runQuery(store, Query.parse(queryInput))
+    return DuckRack.runQuery(this.store, Query.parse(queryInput))
   }
 
   static validateEntryVersion (newEntry, oldEntry) {

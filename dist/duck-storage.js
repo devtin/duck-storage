@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.8
+ * duck-storage v0.0.9
  * (c) 2020 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -726,7 +726,7 @@ class DuckRack extends events.EventEmitter {
 
     const { store, storeKey } = this;
 
-/*
+    /*
     if (newEntry._id && await this.entryExists(newEntry._id)) {
       throw new Error(`Entry ${newEntry._id} already exists`)
     }

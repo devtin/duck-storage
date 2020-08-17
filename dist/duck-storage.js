@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.9
+ * duck-storage v0.0.10
  * (c) 2020 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -7,18 +7,47 @@
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
-function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
-
 var duckfficer = require('duckfficer');
-var set = _interopDefault(require('lodash/set'));
-var get = _interopDefault(require('lodash/get'));
+var set = require('lodash/set');
+var get = require('lodash/get');
 var deepObjectDiff = require('deep-object-diff');
-var bcrypt = _interopDefault(require('bcrypt'));
+var bcrypt = require('bcrypt');
 var events = require('events');
-var sift = _interopDefault(require('sift'));
-var camelCase = _interopDefault(require('lodash/camelCase'));
-var kebabCase = _interopDefault(require('lodash/kebabCase'));
+var sift = require('sift');
+var camelCase = require('lodash/camelCase');
+var kebabCase = require('lodash/kebabCase');
 var jsDirIntoJson = require('js-dir-into-json');
+
+function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
+
+function _interopNamespace(e) {
+  if (e && e.__esModule) { return e; } else {
+    var n = Object.create(null);
+    if (e) {
+      Object.keys(e).forEach(function (k) {
+        if (k !== 'default') {
+          var d = Object.getOwnPropertyDescriptor(e, k);
+          Object.defineProperty(n, k, d.get ? d : {
+            enumerable: true,
+            get: function () {
+              return e[k];
+            }
+          });
+        }
+      });
+    }
+    n['default'] = e;
+    return Object.freeze(n);
+  }
+}
+
+var duckfficer__namespace = /*#__PURE__*/_interopNamespace(duckfficer);
+var set__default = /*#__PURE__*/_interopDefaultLegacy(set);
+var get__default = /*#__PURE__*/_interopDefaultLegacy(get);
+var bcrypt__default = /*#__PURE__*/_interopDefaultLegacy(bcrypt);
+var sift__default = /*#__PURE__*/_interopDefaultLegacy(sift);
+var camelCase__default = /*#__PURE__*/_interopDefaultLegacy(camelCase);
+var kebabCase__default = /*#__PURE__*/_interopDefaultLegacy(kebabCase);
 
 function loadReference ({ DuckStorage, duckRack }) {
   async function loadReferences (entry) {
@@ -36,7 +65,7 @@ function loadReference ({ DuckStorage, duckRack }) {
       });
 
     for (const entryToLoad of entriesToLoad) {
-      set(entry, entryToLoad.path, await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id));
+      set__default['default'](entry, entryToLoad.path, await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id));
     }
 
     return entry
@@ -48,7 +77,6 @@ function loadReference ({ DuckStorage, duckRack }) {
 
 function uniqueKeys ({ DuckStorage, duckRack }) {
   const keys = {};
-  console.log('duckRack.duckModel', duckRack.duckModel);
   duckRack.duckModel.schema.children.forEach(schema => {
     if (schema.settings.unique) {
       const keyName = typeof schema.settings.unique === 'boolean' ? schema.fullPath : schema.settings.unique;
@@ -64,7 +92,7 @@ function uniqueKeys ({ DuckStorage, duckRack }) {
     Object.keys(keys).forEach(keyName => {
       const $and = [];
       keys[keyName].forEach(propName => {
-        $and.push({ [propName]: { $eq: get(entry, propName, undefined) } });
+        $and.push({ [propName]: { $eq: get__default['default'](entry, propName, undefined) } });
       });
       $or.push({ $and });
     });
@@ -76,8 +104,8 @@ function uniqueKeys ({ DuckStorage, duckRack }) {
       const failingEntry = found[0];
       const failingKeys = Object.keys(keys).filter(keyId => {
         const props = keys[keyId];
-        const matchingKey = get(failingEntry, props);
-        return Object.keys(deepObjectDiff.diff(matchingKey, get(entry, props))).length === 0
+        const matchingKey = get__default['default'](failingEntry, props);
+        return Object.keys(deepObjectDiff.diff(matchingKey, get__default['default'](entry, props))).length === 0
       });
       throw new Error(`primary keys (${failingKeys.join(', ')}) failed for document`)
     }
@@ -117,8 +145,7 @@ function hashPasswords ({ DuckStorage, duckRack }) {
       });
 
     for (const field of fieldsToEncrypt) {
-      console.log('set', field, get(entry, field));
-      set(entry, field, await bcrypt.hash(get(entry, field), 10));
+      set__default['default'](entry, field, await bcrypt__default['default'].hash(get__default['default'](entry, field), 10));
     }
 
     return entry
@@ -689,10 +716,10 @@ class DuckRack extends events.EventEmitter {
   }
 
   dispatch (eventName, payload) {
-    const eventKey = camelCase(eventName);
-    eventName = kebabCase(eventName);
+    const eventKey = camelCase__default['default'](eventName);
+    eventName = kebabCase__default['default'](eventName);
     try {
-      this.emit(kebabCase(eventName), this.events[eventKey].parse(payload));
+      this.emit(kebabCase__default['default'](eventName), this.events[eventKey].parse(payload));
     } catch (err) {
       throw new EventError(`${eventName} payload is not valid`)
     }
@@ -703,7 +730,7 @@ class DuckRack extends events.EventEmitter {
   }
 
   static runQuery (entity, query) {
-    return entity.filter(sift(query))
+    return entity.filter(sift__default['default'](query))
   }
 
   /**
@@ -734,7 +761,7 @@ class DuckRack extends events.EventEmitter {
 
     let entry = this.schema.parse(newEntry, { state: { method: 'create' } });
 
-    entry = await this.trigger('before', 'create', newEntry);
+    entry = await this.trigger('before', 'create', entry);
 
     storeKey[entry._id] = entry;
     store.push(entry);
@@ -817,7 +844,7 @@ class DuckRack extends events.EventEmitter {
 
   async delete (query) {
     const entity = this.store;
-    const removedEntries = entity.filter(sift(query));
+    const removedEntries = entity.filter(sift__default['default'](query));
 
     for (const entry of removedEntries) {
       await this.trigger('before', 'remove', entry);
@@ -1203,7 +1230,7 @@ class Duck extends events.EventEmitter {
       const defaultValue = defaultValues[path] || (def ? (typeof def === 'function' ? def() : def) : undefined);
 
       if (defaultValue !== undefined || deeplyRequired(this.schema, path)) {
-        set(data, path, defaultValue);
+        set__default['default'](data, path, defaultValue);
       }
     });
 
@@ -1289,7 +1316,7 @@ class Duck extends events.EventEmitter {
           }
         }
 
-        return set(data, finalPath, $this.inlineParsing ? $this.schema.schemaAtPath(finalPath).parse(value, { state }) : value)
+        return set__default['default'](data, finalPath, $this.inlineParsing ? $this.schema.schemaAtPath(finalPath).parse(value, { state }) : value)
       }
     });
 
@@ -1308,7 +1335,7 @@ async function registerDuckRacksFromDir (directory) {
   return racks
 }
 
-exports.Duckfficer = duckfficer;
+exports.Duckfficer = duckfficer__namespace;
 exports.Duck = Duck;
 exports.DuckRack = DuckRack;
 exports.DuckStorage = DuckStorage;

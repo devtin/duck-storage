@@ -1,5 +1,5 @@
 import test from 'ava'
-import { Schema } from '@devtin/schema-validator'
+import { Schema } from 'duckfficer'
 import { schemaDuckMonitor } from './test-tools'
 
 test('checks all events emitted by a duck', t => {

@@ -9,7 +9,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-var schemaValidator = require('@devtin/schema-validator');
+var duckfficer = require('duckfficer');
 var set = _interopDefault(require('lodash/set'));
 var get = _interopDefault(require('lodash/get'));
 var deepObjectDiff = require('deep-object-diff');
@@ -26,11 +26,11 @@ function loadReference ({ DuckStorage, duckRack }) {
       .schema
       .paths
       .filter((path) => {
-        return this.duckModel.schema.schemaAtPath(path).settings.duckRack && schemaValidator.Utils.find(entry, path)
+        return this.duckModel.schema.schemaAtPath(path).settings.duckRack && duckfficer.Utils.find(entry, path)
       })
       .map(path => {
         const Rack = DuckStorage.getRackByName(this.duckModel.schema.schemaAtPath(path).settings.duckRack);
-        const _idPayload = schemaValidator.Utils.find(entry, path);
+        const _idPayload = duckfficer.Utils.find(entry, path);
         const _id = Rack.duckModel.schema.isValid(_idPayload) ? _idPayload._id : _idPayload;
         return { duckRack: this.duckModel.schema.schemaAtPath(path).settings.duckRack, _id, path }
       });
@@ -96,7 +96,7 @@ function uniqueKeys ({ DuckStorage, duckRack }) {
   });
 }
 
-schemaValidator.Transformers.Password = {
+duckfficer.Transformers.Password = {
   loaders: [
     {
       type: String,
@@ -105,7 +105,7 @@ schemaValidator.Transformers.Password = {
   ]
 };
 
-const { obj2dot } = schemaValidator.Utils;
+const { obj2dot } = duckfficer.Utils;
 
 function hashPasswords ({ DuckStorage, duckRack }) {
   async function encryptPasswords (entry, fields) {
@@ -367,7 +367,7 @@ ObjectID.prototype[inspect] = function() { return "ObjectID("+this+")" };
 ObjectID.prototype.toJSON = ObjectID.prototype.toHexString;
 ObjectID.prototype.toString = ObjectID.prototype.toHexString;
 
-schemaValidator.Transformers.ObjectId = {
+duckfficer.Transformers.ObjectId = {
   settings: {
     unique: true
   },
@@ -421,7 +421,7 @@ function uuid () {
   })
 }
 
-schemaValidator.Transformers.uuid = {
+duckfficer.Transformers.uuid = {
   settings: {
     loaders: [{
       type: String,
@@ -435,7 +435,7 @@ schemaValidator.Transformers.uuid = {
 const primitiveValues = [Number, BigInt, String, Object, Array, Boolean, Date];
 const scalableValues = [Number, BigInt, Date];
 
-const QuerySchema = new schemaValidator.Schema({
+const QuerySchema = new duckfficer.Schema({
   // comparison
   $eq: primitiveValues,
   $ne: primitiveValues,
@@ -488,9 +488,9 @@ const Query = {
         return v
       }
 
-      return new schemaValidator.Schema({ type: Object, mapSchema: 'Query' }, {
+      return new duckfficer.Schema({ type: Object, mapSchema: 'Query' }, {
         name: this.name,
-        parent: this instanceof schemaValidator.Schema ? this : undefined
+        parent: this instanceof duckfficer.Schema ? this : undefined
       }).parse(v)
     }
 
@@ -506,10 +506,10 @@ const Query = {
 
     // console.log(`looking for schema at`, this.fullPath, operator, QuerySchema.schemaAtPath(operator))
     return {
-      [operator]: schemaValidator.Schema.cloneSchema({
+      [operator]: duckfficer.Schema.cloneSchema({
         schema: QuerySchema.schemaAtPath(operator),
         name: `${this.fullPath}.${operator}`,
-        parent: this instanceof schemaValidator.Schema ? this : undefined
+        parent: this instanceof duckfficer.Schema ? this : undefined
       }).parse(v[operator])
     }
   },
@@ -520,17 +520,17 @@ const Query = {
   }
 };
 
-schemaValidator.Transformers.Query = Query;
+duckfficer.Transformers.Query = Query;
 
-const SchemaType = new schemaValidator.Schema({
+const SchemaType = new duckfficer.Schema({
   type: Object
 }, {
   parse (v) {
-    return v instanceof schemaValidator.Schema ? v : new schemaValidator.Schema(v)
+    return v instanceof duckfficer.Schema ? v : new duckfficer.Schema(v)
   }
 });
 
-const Meth = new schemaValidator.Schema({
+const Meth = new duckfficer.Schema({
   description: {
     type: String,
     required: false
@@ -560,7 +560,7 @@ const Meth = new schemaValidator.Schema({
   }
 });
 
-const Methods = new schemaValidator.Schema({
+const Methods = new duckfficer.Schema({
   type: 'Object',
   mapSchema: Meth
 }, {
@@ -621,9 +621,9 @@ class EventError extends Error {
   }
 }
 
-const { forEach } = schemaValidator.Utils;
+const { forEach } = duckfficer.Utils;
 
-const Query$1 = new schemaValidator.Schema({
+const Query$1 = new duckfficer.Schema({
   type: 'Query'
 });
 
@@ -667,8 +667,8 @@ class DuckRack extends events.EventEmitter {
         }
         if ($this.methods[key]) {
           return (...payload) => {
-            const inputValidation = $this.methods[key].input ? schemaValidator.Schema.ensureSchema($this.methods[key].input) : undefined;
-            const outputValidation = $this.methods[key].output ? schemaValidator.Schema.ensureSchema($this.methods[key].output) : undefined;
+            const inputValidation = $this.methods[key].input ? duckfficer.Schema.ensureSchema($this.methods[key].input) : undefined;
+            const outputValidation = $this.methods[key].output ? duckfficer.Schema.ensureSchema($this.methods[key].output) : undefined;
 
             if (inputValidation && payload.length > 1) {
               throw new DuckRackError(`Only one argument expected at method ${key}`)
@@ -1127,20 +1127,20 @@ class Duck extends events.EventEmitter {
     inlineStructureValidation = true
   } = {}) {
     super();
-    const originalSchema = schemaValidator.Schema.ensureSchema(schema);
+    const originalSchema = duckfficer.Schema.ensureSchema(schema);
     this.originalSchema = originalSchema;
 
-    schema = schemaValidator.Schema.cloneSchema({ schema: originalSchema });
+    schema = duckfficer.Schema.cloneSchema({ schema: originalSchema });
 
     if (schema.hasField('_id')) {
       throw new Error('_id is reserved for the duck')
     }
 
     if (schema.hasField('_v')) {
-      throw new Error('_id is reserved for the duck')
+      throw new Error('_v is reserved for the duck')
     }
 
-    const _id = new schemaValidator.Schema(idType, {
+    const _id = new duckfficer.Schema(idType, {
       name: '_id',
       settings: {
         required: false,
@@ -1150,7 +1150,7 @@ class Duck extends events.EventEmitter {
       }
     });
 
-    const _v = new schemaValidator.Schema({
+    const _v = new duckfficer.Schema({
       type: Number,
       autoCast: true,
       required: false,
@@ -1233,7 +1233,7 @@ class Duck extends events.EventEmitter {
 
         const obj = pathToObj(finalPath, undefined);
         const parentSchema = parentPath ? $this.schema.schemaAtPath(parentPath) : $this.schema;
-        const parentObj = parentPath ? schemaValidator.Utils.find(data, finalPath) : data;
+        const parentObj = parentPath ? duckfficer.Utils.find(data, finalPath) : data;
 
         // find methods
         if (parentSchema && parentSchema._methods[finalPath]) {
@@ -1249,7 +1249,7 @@ class Duck extends events.EventEmitter {
         })[0] : false;
 
         if (virtual) {
-          return virtual.getter.call(parentPath ? schemaValidator.Utils.find(data, parentPath) : data)
+          return virtual.getter.call(parentPath ? duckfficer.Utils.find(data, parentPath) : data)
         }
 
         try {
@@ -1260,7 +1260,7 @@ class Duck extends events.EventEmitter {
 
         // deliver primitive value (or final value in the schema path)
         if (!$this.schema.schemaAtPath(finalPath).hasChildren) {
-          return schemaValidator.Utils.find(data, finalPath)
+          return duckfficer.Utils.find(data, finalPath)
         }
 
         return this.nest({})
@@ -1276,7 +1276,7 @@ class Duck extends events.EventEmitter {
         })[0];
 
         if (virtual) {
-          virtual.setter.call(parentPath ? schemaValidator.Utils.find(data, parentPath) : data, value);
+          virtual.setter.call(parentPath ? duckfficer.Utils.find(data, parentPath) : data, value);
           return true
         }
 
@@ -1301,14 +1301,14 @@ async function registerDuckRacksFromDir (directory) {
   const racks = await jsDirIntoJson.jsDirIntoJson(directory);
   Object.keys(racks).forEach((rackName) => {
     const { duckModel, methods } = racks[rackName];
-    const schema = new schemaValidator.Schema(duckModel.schema, { methods: duckModel.methods });
+    const schema = new duckfficer.Schema(duckModel.schema, { methods: duckModel.methods });
     const duckRack = new DuckRack(rackName, { duckModel: new Duck({ schema }), methods });
     DuckStorage.registerRack(duckRack);
   });
   return racks
 }
 
-exports.Duckfficer = schemaValidator;
+exports.Duckfficer = duckfficer;
 exports.Duck = Duck;
 exports.DuckRack = DuckRack;
 exports.DuckStorage = DuckStorage;

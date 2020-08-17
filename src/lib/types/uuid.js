@@ -1,4 +1,4 @@
-import { Transformers } from '@devtin/schema-validator'
+import { Transformers } from 'duckfficer'
 
 export const UUIDPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}$/
 

@@ -1,4 +1,4 @@
-import { Utils } from '@devtin/schema-validator'
+import { Utils } from 'duckfficer'
 import set from 'lodash/set'
 
 export default function ({ DuckStorage, duckRack }) {

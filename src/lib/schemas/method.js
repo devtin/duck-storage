@@ -1,4 +1,4 @@
-import { Schema } from '@devtin/schema-validator'
+import { Schema } from 'duckfficer'
 
 const SchemaType = new Schema({
   type: Object

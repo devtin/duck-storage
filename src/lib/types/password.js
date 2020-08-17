@@ -1,4 +1,4 @@
-import { Transformers } from '@devtin/schema-validator'
+import { Transformers } from 'duckfficer'
 
 Transformers.Password = {
   loaders: [

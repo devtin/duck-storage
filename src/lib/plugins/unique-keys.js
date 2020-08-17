@@ -3,7 +3,6 @@ import { diff } from 'deep-object-diff'
 
 export default function ({ DuckStorage, duckRack }) {
   const keys = {}
-  console.log('duckRack.duckModel', duckRack.duckModel)
   duckRack.duckModel.schema.children.forEach(schema => {
     if (schema.settings.unique) {
       const keyName = typeof schema.settings.unique === 'boolean' ? schema.fullPath : schema.settings.unique

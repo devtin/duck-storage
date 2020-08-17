@@ -1,5 +1,5 @@
 import { Duck } from './duck'
-import { Schema } from '@devtin/schema-validator'
+import { Schema } from 'duckfficer'
 import test from 'ava'
 
 const Email = new Schema({

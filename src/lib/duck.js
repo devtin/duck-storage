@@ -1,7 +1,7 @@
 import DeepProxy from 'proxy-deep'
 import set from 'lodash/set'
 import { EventEmitter } from 'events'
-import { Schema, Utils } from '@devtin/schema-validator'
+import { Schema, Utils } from 'duckfficer'
 import './types/object-id'
 import './types/uuid'
 import { pathToObj } from './path-to-object'
@@ -45,7 +45,7 @@ export class Duck extends EventEmitter {
     }
 
     if (schema.hasField('_v')) {
-      throw new Error('_id is reserved for the duck')
+      throw new Error('_v is reserved for the duck')
     }
 
     const _id = new Schema(idType, {

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events'
-import { Utils, Schema } from '@devtin/schema-validator'
+import { Utils, Schema } from 'duckfficer'
 import sift from 'sift'
 import camelCase from 'lodash/camelCase'
 import kebabCase from 'lodash/kebabCase'
@@ -138,7 +138,7 @@ export class DuckRack extends EventEmitter {
 
     let entry = this.schema.parse(newEntry, { state: { method: 'create' } })
 
-    entry = await this.trigger('before', 'create', newEntry)
+    entry = await this.trigger('before', 'create', entry)
 
     storeKey[entry._id] = entry
     store.push(entry)

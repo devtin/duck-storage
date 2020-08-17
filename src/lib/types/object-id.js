@@ -1,4 +1,4 @@
-import { Transformers } from '@devtin/schema-validator'
+import { Transformers } from 'duckfficer'
 import ObjectId from 'bson-objectid'
 import { DuckStorage } from '../duck-storage'
 

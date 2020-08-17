@@ -1,6 +1,6 @@
 import { Duck } from './duck'
 import { DuckRack } from './duck-rack'
-import { Schema } from '@devtin/schema-validator'
+import { Schema } from 'duckfficer'
 import test from 'ava'
 import { DuckStorage } from './duck-storage'
 

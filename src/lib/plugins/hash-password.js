@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt'
 import set from 'lodash/set'
 import get from 'lodash/get'
-import { Utils } from '@devtin/schema-validator'
+import { Utils } from 'duckfficer'
 import '../types/password'
 
 const { obj2dot } = Utils
@@ -16,7 +16,6 @@ export default function ({ DuckStorage, duckRack }) {
       })
 
     for (const field of fieldsToEncrypt) {
-      console.log('set', field, get(entry, field))
       set(entry, field, await bcrypt.hash(get(entry, field), 10))
     }
 

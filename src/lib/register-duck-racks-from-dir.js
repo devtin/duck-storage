@@ -1,5 +1,5 @@
 import { jsDirIntoJson } from 'js-dir-into-json'
-import { Schema } from '@devtin/schema-validator'
+import { Schema } from 'duckfficer'
 import { DuckStorage } from './duck-storage'
 import { DuckRack } from './duck-rack'
 import { Duck } from './duck'

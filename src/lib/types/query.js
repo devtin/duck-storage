@@ -1,4 +1,4 @@
-import { Schema, Transformers } from '@devtin/schema-validator'
+import { Schema, Transformers } from 'duckfficer'
 
 const primitiveValues = [Number, BigInt, String, Object, Array, Boolean, Date]
 const scalableValues = [Number, BigInt, Date]

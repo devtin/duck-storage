@@ -68,6 +68,7 @@ export class DuckStorageClass extends EventEmitter {
       fn({ DuckStorage: this, duckRack })
     })
     this._wireRack(duckRack)
+    return duckRack
   }
 
   removeRack (rackName) {

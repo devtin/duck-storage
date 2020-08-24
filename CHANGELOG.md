@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.11](https://github.com/devtin/duck-storage/compare/v0.0.10...v0.0.11) (2020-08-24)
+
+
+### Features
+
+* registerDuckRacksFromObj ([18547a9](https://github.com/devtin/duck-storage/commit/18547a93b8e92ea232655fe001f7222f7f9f274a))
+
+
+### Bug Fixes
+
+* Boolean or Schema ([4d6004e](https://github.com/devtin/duck-storage/commit/4d6004e52e3f842cbce5e589cc9c8e8c069ccc6c))
+* export registerDuckRacksFromObj ([a2b67ec](https://github.com/devtin/duck-storage/commit/a2b67ec528ca0dc1315ae33e5dc698386a41336d))
+* prevent virtuals ([f86a680](https://github.com/devtin/duck-storage/commit/f86a680135c149fd825d27fb95e9e90748576c23))
+* **registerRack:** return duckRack ([1ee70cb](https://github.com/devtin/duck-storage/commit/1ee70cbcdfe77d64ebd5c906753055e727509ec3))
+
 ### [0.0.10](https://github.com/devtin/duck-storage/compare/v0.0.9...v0.0.10) (2020-08-17)
 
 

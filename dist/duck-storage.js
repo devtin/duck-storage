@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.10
+ * duck-storage v0.0.11
  * (c) 2020 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -549,11 +549,14 @@ const Query = {
 
 duckfficer.Transformers.Query = Query;
 
-const SchemaType = new duckfficer.Schema({
-  type: Object
+const BooleanOrSchema = new duckfficer.Schema({
+  type: [Object, Boolean]
 }, {
-  parse (v) {
-    return v instanceof duckfficer.Schema ? v : new duckfficer.Schema(v)
+  cast (v) {
+    if (typeof v === 'object') {
+      return duckfficer.Schema.ensureSchema(v)
+    }
+    return v
   }
 });
 
@@ -563,11 +566,11 @@ const Meth = new duckfficer.Schema({
     required: false
   },
   input: {
-    type: SchemaType,
+    type: BooleanOrSchema,
     required: false
   },
   output: {
-    type: SchemaType,
+    type: BooleanOrSchema,
     required: false
   },
   handler: Function
@@ -759,7 +762,7 @@ class DuckRack extends events.EventEmitter {
     }
 */
 
-    let entry = this.schema.parse(newEntry, { state: { method: 'create' } });
+    let entry = this.schema.parse(newEntry, { state: { method: 'create' }, virtualsEnumerable: false });
 
     entry = await this.trigger('before', 'create', entry);
 
@@ -985,6 +988,11 @@ class DuckStorageClass extends events.EventEmitter {
     this.plugins.push(fn);
   }
 
+  /**
+   * Registers given DuckRack
+   * @param {DuckRack} duckRack
+   * @return {DuckRack}
+   */
   registerRack (duckRack) {
     if (this.store[duckRack.name]) {
       throw new Error(`a DuckRack with the name ${duckRack.name} is already registered`)
@@ -995,6 +1003,7 @@ class DuckStorageClass extends events.EventEmitter {
       fn({ DuckStorage: this, duckRack });
     });
     this._wireRack(duckRack);
+    return duckRack
   }
 
   removeRack (rackName) {
@@ -1129,8 +1138,8 @@ function pathToObj (path, value) {
 const virtualReservedProps = ['$$typeof', 'valueOf', 'constructor', 'then', 'toJSON'];
 
 const Doc = {
-  toObject (doc, state = {}) {
-    return this.schema.parse(Object.assign({}, doc), { state })
+  toObject (doc, state = {}, virtualsEnumerable = false) {
+    return this.schema.parse(Object.assign({}, doc), { state, virtualsEnumerable })
   }
 };
 
@@ -1220,7 +1229,7 @@ class Duck extends events.EventEmitter {
     let consolidated = this.schema.isValid(defaultValues);
 
     const consolidate = () => {
-      data = this.schema.parse(data);
+      data = this.schema.parse(data, { virtualsEnumerable: false });
       consolidated = true;
       return data
     };
@@ -1324,15 +1333,22 @@ class Duck extends events.EventEmitter {
   }
 }
 
-async function registerDuckRacksFromDir (directory) {
-  const racks = await jsDirIntoJson.jsDirIntoJson(directory);
-  Object.keys(racks).forEach((rackName) => {
-    const { duckModel, methods } = racks[rackName];
+/**
+ * Register multiple DuckModels at once in DuckRack's
+ * @param {Object} duckRacks - an object mapping Duck's
+ * @return {DuckRack[]}
+ */
+function registerDuckRacksFromObj (duckRacks) {
+  return Object.keys(duckRacks).map((rackName) => {
+    const { duckModel, methods } = duckRacks[rackName];
     const schema = new duckfficer.Schema(duckModel.schema, { methods: duckModel.methods });
     const duckRack = new DuckRack(rackName, { duckModel: new Duck({ schema }), methods });
-    DuckStorage.registerRack(duckRack);
-  });
-  return racks
+    return DuckStorage.registerRack(duckRack)
+  })
+}
+
+async function registerDuckRacksFromDir (directory) {
+  return registerDuckRacksFromObj(await jsDirIntoJson.jsDirIntoJson(directory))
 }
 
 exports.Duckfficer = duckfficer__namespace;
@@ -1340,3 +1356,4 @@ exports.Duck = Duck;
 exports.DuckRack = DuckRack;
 exports.DuckStorage = DuckStorage;
 exports.registerDuckRacksFromDir = registerDuckRacksFromDir;
+exports.registerDuckRacksFromObj = registerDuckRacksFromObj;

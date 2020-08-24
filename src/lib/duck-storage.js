@@ -58,6 +58,11 @@ export class DuckStorageClass extends EventEmitter {
     this.plugins.push(fn)
   }
 
+  /**
+   * Registers given DuckRack
+   * @param {DuckRack} duckRack
+   * @return {DuckRack}
+   */
   registerRack (duckRack) {
     if (this.store[duckRack.name]) {
       throw new Error(`a DuckRack with the name ${duckRack.name} is already registered`)

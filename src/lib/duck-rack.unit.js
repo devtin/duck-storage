@@ -116,6 +116,7 @@ test('updates information of a duck', async t => {
 
   const updatedEntry = await Rack.read(created._id)
   t.is(updatedEntry.firstName, 'Olivia')
+  t.is(updatedEntry.fullName, 'Olivia Gonzalez')
 })
 
 test('updates information of multiple ducks at a time', async t => {

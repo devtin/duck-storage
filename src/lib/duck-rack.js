@@ -136,7 +136,7 @@ export class DuckRack extends EventEmitter {
     }
 */
 
-    let entry = this.schema.parse(newEntry, { state: { method: 'create' } })
+    let entry = this.schema.parse(newEntry, { state: { method: 'create' }, virtualsEnumerable: false })
 
     entry = await this.trigger('before', 'create', entry)
 

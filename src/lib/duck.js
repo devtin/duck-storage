@@ -10,8 +10,8 @@ import ObjectId from 'bson-objectid'
 const virtualReservedProps = ['$$typeof', 'valueOf', 'constructor', 'then', 'toJSON']
 
 const Doc = {
-  toObject (doc, state = {}) {
-    return this.schema.parse(Object.assign({}, doc), { state })
+  toObject (doc, state = {}, virtualsEnumerable = false) {
+    return this.schema.parse(Object.assign({}, doc), { state, virtualsEnumerable })
   }
 }
 
@@ -101,7 +101,7 @@ export class Duck extends EventEmitter {
     let consolidated = this.schema.isValid(defaultValues)
 
     const consolidate = () => {
-      data = this.schema.parse(data)
+      data = this.schema.parse(data, { virtualsEnumerable: false })
       consolidated = true
       return data
     }

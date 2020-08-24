@@ -1,10 +1,13 @@
 import { Schema } from 'duckfficer'
 
-const SchemaType = new Schema({
-  type: Object
+const BooleanOrSchema = new Schema({
+  type: [Object, Boolean]
 }, {
-  parse (v) {
-    return v instanceof Schema ? v : new Schema(v)
+  cast (v) {
+    if (typeof v === 'object') {
+      return Schema.ensureSchema(v)
+    }
+    return v
   }
 })
 
@@ -14,11 +17,11 @@ export const Meth = new Schema({
     required: false
   },
   input: {
-    type: SchemaType,
+    type: BooleanOrSchema,
     required: false
   },
   output: {
-    type: SchemaType,
+    type: BooleanOrSchema,
     required: false
   },
   handler: Function

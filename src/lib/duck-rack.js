@@ -158,6 +158,7 @@ export class DuckRack extends EventEmitter {
     const entry = await this.findOneById(_id)
     if (entry) {
       const entryModel = this.duckModel.getModel(Object.assign({}, await this.trigger('before', 'read', entry)))
+      entryModel.consolidate()
       return this.trigger('after', 'read', entryModel)
     }
   }

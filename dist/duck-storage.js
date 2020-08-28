@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.11
+ * duck-storage v0.0.13
  * (c) 2020 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -784,6 +784,7 @@ class DuckRack extends events.EventEmitter {
     const entry = await this.findOneById(_id);
     if (entry) {
       const entryModel = this.duckModel.getModel(Object.assign({}, await this.trigger('before', 'read', entry)));
+      entryModel.consolidate();
       return this.trigger('after', 'read', entryModel)
     }
   }

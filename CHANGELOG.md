@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.13](https://github.com/devtin/duck-storage/compare/v0.0.11...v0.0.13) (2020-08-28)
+
+
+### Bug Fixes
+
+* consolidate model at read ([00ec13b](https://github.com/devtin/duck-storage/commit/00ec13be24a1aeb4ba2260eb7f5887719de64bf3))
+
 ### [0.0.11](https://github.com/devtin/duck-storage/compare/v0.0.10...v0.0.11) (2020-08-24)
 
 

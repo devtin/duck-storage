@@ -1,47 +1,17 @@
 import { Schema, Transformers } from 'duckfficer'
 
-const primitiveValues = [Number, BigInt, String, Object, Array, Boolean, Date]
-const scalableValues = [Number, BigInt, Date]
+// const primitiveValues = [Number, BigInt, String, Object, Array, Boolean, Date]
+// const scalableValues = [Number, BigInt, Date]
 
-export const QuerySchema = new Schema({
-  // comparison
-  $eq: primitiveValues,
-  $ne: primitiveValues,
-  $lte: scalableValues,
-  $gte: scalableValues,
-  $gt: scalableValues,
-  $lt: scalableValues,
-  $in: Array,
-  $nin: Array,
-  // logical
-  $and: {
-    type: Array,
-    arraySchema: 'Query'
-  },
-  $not: {
-    type: Array,
-    arraySchema: 'Query'
-  },
-  $nor: {
-    type: Array,
-    arraySchema: 'Query'
-  },
-  $or: {
-    type: Array,
-    arraySchema: 'Query'
-  },
-  // element query
-  $exists: Boolean,
-  $type: {
-    type: Function
-  }
+export const SortSchema = new Schema({
+  $sort: Object
 })
 
-export const Query = {
+export const Sort = {
   settings: {
     autoCast: true
   },
-  isOperator (o) {
+  isSort (o) {
     return Object.keys(o).filter(item => /^\$/.test(item)).length > 0
   },
   cast (v) {
@@ -51,7 +21,7 @@ export const Query = {
     return v
   },
   parse (v) {
-    if (!Query.isOperator(v)) {
+    if (!Sort.isOperator(v)) {
       if (Object.keys(v).length === 0) {
         return v
       }
@@ -64,7 +34,7 @@ export const Query = {
 
     const operator = Object.keys(v)[0]
 
-    if (!QuerySchema.hasField(operator)) {
+    if (!SortSchema.hasField(operator)) {
       const err = `Unknown operator ${operator}`
       if (this.throwError) {
         this.throwError(err)
@@ -75,12 +45,17 @@ export const Query = {
     // console.log(`looking for schema at`, this.fullPath, operator, QuerySchema.schemaAtPath(operator))
     return {
       [operator]: Schema.cloneSchema({
-        schema: QuerySchema.schemaAtPath(operator),
+        schema: SortSchema.schemaAtPath(operator),
         name: `${this.fullPath}.${operator}`,
         parent: this instanceof Schema ? this : undefined
       }).parse(v[operator])
     }
+  },
+  validate (v, { state }) {
+    if (v && Sort.isSort(v) && Object.keys(v).length > 1) {
+      this.throwError('Invalid sorter')
+    }
   }
 }
 
-Transformers.Query = Query
+Transformers.Sort = Sort

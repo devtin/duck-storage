@@ -207,6 +207,78 @@ test('lists ducks in the rack', async t => {
   t.deepEqual(res.map(entry => entry.consolidate()), [entry1, entry2])
 })
 
+test('sorts ducks in a rack by custom properties', async t => {
+  const ana = (await Rack.create({
+    firstName: 'Ana',
+    lastName: 'Sosa',
+    address: {
+      line1: 'Brickell Ave',
+      line2: 'Miami',
+      zip: 33129
+    }
+  })).toObject()
+
+  const olivia = (await Rack.create({
+    firstName: 'Olivia',
+    lastName: 'Gonzalez',
+    address: {
+      line1: 'Brickell Ave',
+      line2: 'Miami',
+      zip: 33129
+    }
+  })).toObject()
+
+  const martin = (await Rack.create({
+    firstName: 'Martin',
+    lastName: 'Gonzalez',
+    address: {
+      line1: 'Brickell Ave',
+      line2: 'Miami',
+      zip: 33129
+    }
+  })).toObject()
+
+  const ruth = (await Rack.create({
+    firstName: 'Ruth',
+    lastName: 'Marquez',
+    address: {
+      line1: '11916 SW 154th Ave',
+      line2: 'Kendall',
+      zip: 33196
+    }
+  })).toObject()
+
+  const res = await Rack.list({}, {
+    firstName: -1
+  })
+
+  t.deepEqual(res.map(entry => entry.consolidate()), [ruth, olivia, martin, ana])
+
+  const res2 = await Rack.list({}, {
+    lastName: -1,
+    firstName: 1
+  })
+
+  t.deepEqual(res2.map(entry => entry.consolidate()), [ana, ruth, martin, olivia])
+
+  const res3 = (await Rack.list({}, {
+    address: {
+      zip: -1
+    }
+  })).map(entry => entry.consolidate())
+
+  t.deepEqual(res3, [ruth, ana, olivia, martin])
+
+  const res4 = (await Rack.list({}, {
+    address: {
+      line2: 1
+    },
+    firstName: 1
+  })).map(entry => entry.consolidate())
+
+  t.deepEqual(res4, [ruth, ana, martin, olivia])
+})
+
 test('loads references of ducks in other racks', async t => {
   const orderSchema = new Schema({
     customer: {

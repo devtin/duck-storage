@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.13
+ * duck-storage v0.0.14
  * (c) 2020 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -539,11 +539,6 @@ const Query = {
         parent: this instanceof duckfficer.Schema ? this : undefined
       }).parse(v[operator])
     }
-  },
-  validate (v, { state }) {
-    if (v && Query.isOperator(v) && Object.keys(v).length > 1) {
-      this.throwError('Invalid operator');
-    }
   }
 };
 
@@ -769,7 +764,9 @@ class DuckRack extends events.EventEmitter {
     storeKey[entry._id] = entry;
     store.push(entry);
 
-    const entryModel = await this.trigger('after', 'create', this.duckModel.getModel(entry));
+    const entryModel = this.duckModel.getModel(entry);
+    entryModel.consolidate();
+    await this.trigger('after', 'create', entryModel);
     this.emit('create', entryModel);
 
     return entryModel
@@ -882,10 +879,47 @@ class DuckRack extends events.EventEmitter {
     }
   }
 
-  async list (query) {
-    return (query ? await this.find(query) : this.store).map(value => {
-      return this.duckModel.getModel(value)
-    })
+  async list (query, sort) {
+    const entries = (query ? await this.find(query) : this.store).map(value => {
+      const entry = this.duckModel.getModel(value);
+      entry.consolidate();
+      return entry
+    });
+
+    if (!sort) {
+      return entries
+    }
+
+    const sortArray = (arr, sort) => {
+      const toIndex = (value) => {
+        if (typeof value === 'boolean') {
+          return value ? 1 : -1
+        }
+        return value
+      };
+      const calcIndex = (a, b, factor = 1) => {
+        if (a === b) {
+          return 0
+        }
+
+        if (typeof a === 'string' && typeof b === 'string') {
+          return toIndex(a > b) * factor
+        }
+        const A = toIndex(a);
+        const B = toIndex(b);
+
+        return (A - B) * factor
+      };
+
+      duckfficer.Utils.obj2dot(sort).reverse().forEach(prop => {
+        arr = arr.sort((a, b) => {
+          return calcIndex(duckfficer.Utils.find(a, prop), duckfficer.Utils.find(b, prop), toIndex(duckfficer.Utils.find(sort, prop)))
+        });
+      });
+      return arr
+    };
+
+    return sortArray(entries, sort)
   }
 
   validateId () {

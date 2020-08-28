@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.14](https://github.com/devtin/duck-storage/compare/v0.0.13...v0.0.14) (2020-08-28)
+
+
+### Features
+
+* sort ([79daf38](https://github.com/devtin/duck-storage/commit/79daf3898f5e9acd1e5d6b49b3e12be69951be9a))
+
 ### [0.0.13](https://github.com/devtin/duck-storage/compare/v0.0.11...v0.0.13) (2020-08-28)
 
 

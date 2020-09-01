@@ -1383,7 +1383,9 @@ function registerDuckRacksFromObj (duckRacks) {
 }
 
 async function registerDuckRacksFromDir (directory) {
-  return registerDuckRacksFromObj(await jsDirIntoJson.jsDirIntoJson(directory))
+  return registerDuckRacksFromObj(await jsDirIntoJson.jsDirIntoJson(directory, {
+    extensions: ['!lib', '!__tests__', '!*.unit.js', '!*.test.js', '*.js', '*.mjs']
+  }))
 }
 
 exports.Duckfficer = duckfficer__namespace;

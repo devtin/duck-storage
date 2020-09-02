@@ -2,7 +2,7 @@ import test from 'ava'
 import { Schema } from 'duckfficer'
 import { schemaDuckMonitor } from './test-tools'
 
-test('checks all events emitted by a duck', t => {
+test('checks all events emitted by a duck', async t => {
   const User = new Schema({
     name: String,
     emails: {
@@ -18,21 +18,21 @@ test('checks all events emitted by a duck', t => {
           emailAdded: String
         },
         input: String,
-        handler (email) {
+        async handler (email) {
           this.$field.emails.push(email)
-          this.$emit('emailAdded', email)
+          await this.$emit('emailAdded', email)
         }
       }
     }
   })
 
-  const userPayload = User.parse({
+  const userPayload = await User.parse({
     name: 'Martin'
   })
 
   const eventsFired = schemaDuckMonitor(User, userPayload)
 
   t.is(eventsFired.length, 0)
-  userPayload.addEmail('martin')
+  await userPayload.addEmail('martin')
   t.is(eventsFired.length, 1)
 })

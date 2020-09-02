@@ -50,7 +50,7 @@ export const Query = {
     }
     return v
   },
-  parse (v) {
+  async parse (v) {
     if (!Query.isOperator(v)) {
       if (Object.keys(v).length === 0) {
         return v
@@ -74,7 +74,7 @@ export const Query = {
 
     // console.log(`looking for schema at`, this.fullPath, operator, QuerySchema.schemaAtPath(operator))
     return {
-      [operator]: Schema.cloneSchema({
+      [operator]: await Schema.cloneSchema({
         schema: QuerySchema.schemaAtPath(operator),
         name: `${this.fullPath}.${operator}`,
         parent: this instanceof Schema ? this : undefined

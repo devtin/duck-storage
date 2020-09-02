@@ -4,6 +4,7 @@ import sift from 'sift'
 import camelCase from 'lodash/camelCase'
 import kebabCase from 'lodash/kebabCase'
 import { updatedDiff } from 'deep-object-diff'
+import Promise from 'bluebird'
 
 import './types/object-id.js'
 import './types/uuid.js'
@@ -51,7 +52,7 @@ export class DuckRack extends EventEmitter {
     this.store = []
     this.storeKey = Object.create(null)
     this.duckModel = duckModel
-    this.methods = Methods.parse(methods)
+    this._methods = methods
     this.events = events
     this.name = name
 
@@ -64,13 +65,13 @@ export class DuckRack extends EventEmitter {
 
     // DuckStorage.registerRack(this)
 
-    return new Proxy(this, {
+    this._proxy = new Proxy(this, {
       get (target, key) {
         if (target[key]) {
           return target[key]
         }
         if ($this.methods[key]) {
-          return (...payload) => {
+          return async (...payload) => {
             const inputValidation = $this.methods[key].input ? Schema.ensureSchema($this.methods[key].input) : undefined
             const outputValidation = $this.methods[key].output ? Schema.ensureSchema($this.methods[key].output) : undefined
 
@@ -78,11 +79,11 @@ export class DuckRack extends EventEmitter {
               throw new DuckRackError(`Only one argument expected at method ${key}`)
             }
 
-            const input = inputValidation ? [inputValidation.parse(payload[0])] : payload
+            const input = inputValidation ? [await inputValidation.parse(payload[0])] : payload
 
             try {
-              const result = $this.methods[key].handler.call($this, ...input)
-              return outputValidation ? outputValidation.parse(result) : result
+              const result = await $this.methods[key].handler.call($this, ...input)
+              return outputValidation ? await outputValidation.parse(result) : result
             } catch (err) {
               throw new DuckRackError(err.message, err)
             }
@@ -90,13 +91,21 @@ export class DuckRack extends EventEmitter {
         }
       }
     })
+
+    return this.init()
   }
 
-  dispatch (eventName, payload) {
+  async init () {
+    this.methods = await Methods.parse(this._methods)
+
+    return this._proxy
+  }
+
+  async dispatch (eventName, payload) {
     const eventKey = camelCase(eventName)
     eventName = kebabCase(eventName)
     try {
-      this.emit(kebabCase(eventName), this.events[eventKey].parse(payload))
+      this.emit(kebabCase(eventName), await this.events[eventKey].parse(payload))
     } catch (err) {
       throw new EventError(`${eventName} payload is not valid`)
     }
@@ -136,15 +145,15 @@ export class DuckRack extends EventEmitter {
     }
 */
 
-    let entry = this.schema.parse(newEntry, { state: { method: 'create' }, virtualsEnumerable: false })
+    let entry = await this.schema.parse(newEntry, { state: { method: 'create' }, virtualsEnumerable: false })
 
     entry = await this.trigger('before', 'create', entry)
 
     storeKey[entry._id] = entry
     store.push(entry)
 
-    const entryModel = this.duckModel.getModel(entry)
-    entryModel.consolidate()
+    const entryModel = await this.duckModel.getModel(entry)
+    await entryModel.consolidate()
     await this.trigger('after', 'create', entryModel)
     this.emit('create', entryModel)
 
@@ -159,8 +168,9 @@ export class DuckRack extends EventEmitter {
   async read (_id) {
     const entry = await this.findOneById(_id)
     if (entry) {
-      const entryModel = this.duckModel.getModel(Object.assign({}, await this.trigger('before', 'read', entry)))
-      entryModel.consolidate()
+      const entryModel = await this.duckModel.getModel(Object.assign({}, await this.trigger('before', 'read', entry)))
+      await entryModel.consolidate()
+
       return this.trigger('after', 'read', entryModel)
     }
   }
@@ -192,7 +202,7 @@ export class DuckRack extends EventEmitter {
     })
 
     for (const oldEntry of entries) {
-      const entry = Object.assign({}, oldEntry, newEntry)
+      const entry = await this.schema.parse(Object.assign({}, oldEntry, newEntry))
 
       if (Object.keys(updatedDiff(oldEntry, entry)).length === 0) {
         continue
@@ -259,9 +269,9 @@ export class DuckRack extends EventEmitter {
   }
 
   async list (query, sort) {
-    const entries = (query ? await this.find(query) : this.store).map(value => {
-      const entry = this.duckModel.getModel(value)
-      entry.consolidate()
+    const entries = await Promise.map(query ? await this.find(query) : this.store, async value => {
+      const entry = await this.duckModel.getModel(value)
+      await entry.consolidate()
       return entry
     })
 
@@ -317,7 +327,8 @@ export class DuckRack extends EventEmitter {
         $eq: _id
       }
     }
-    return (await DuckRack.runQuery(this.store, Query.parse(queryInput)))[0]
+    const theQuery = await Query.parse(queryInput)
+    return (await DuckRack.runQuery(this.store, theQuery))[0]
   }
 
   async find (queryInput) {
@@ -329,7 +340,7 @@ export class DuckRack extends EventEmitter {
       }
     }
 
-    return DuckRack.runQuery(this.store, Query.parse(queryInput))
+    return DuckRack.runQuery(this.store, await Query.parse(queryInput))
   }
 
   static validateEntryVersion (newEntry, oldEntry) {

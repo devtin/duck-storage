@@ -31,7 +31,6 @@ export class Duck extends EventEmitter {
   constructor ({
     schema,
     idType = 'ObjectId',
-    inlineParsing = true,
     inlineStructureValidation = true
   } = {}) {
     super()
@@ -73,7 +72,6 @@ export class Duck extends EventEmitter {
     schema.children.unshift(_id, _v)
 
     this.schema = schema
-    this.inlineParsing = inlineParsing
     this.inlineStructureValidation = inlineStructureValidation
     this.idType = idType
   }
@@ -95,20 +93,20 @@ export class Duck extends EventEmitter {
    * @param {Object} [state]
    * @return {Object} the duck proxy model
    */
-  getModel (defaultValues = {}, state) {
+  async getModel (defaultValues = {}, state) {
     const $this = this
     let data = {}
-    let consolidated = this.schema.isValid(defaultValues)
+    let consolidated = await this.schema.isValid(defaultValues)
 
-    const consolidate = () => {
-      data = this.schema.parse(data, { virtualsEnumerable: false })
+    const consolidate = async () => {
+      data = await this.schema.parse(data, { virtualsEnumerable: false })
       consolidated = true
       return data
     }
 
-    this.schema.paths.forEach(path => {
+    await Utils.PromiseEach(this.schema.paths, async path => {
       const def = this.schema.schemaAtPath(path).settings.default
-      const defaultValue = defaultValues[path] || (def ? (typeof def === 'function' ? def() : def) : undefined)
+      const defaultValue = defaultValues[path] || (def ? (typeof def === 'function' ? await def() : def) : undefined)
 
       if (defaultValue !== undefined || deeplyRequired(this.schema, path)) {
         set(data, path, defaultValue)
@@ -197,7 +195,7 @@ export class Duck extends EventEmitter {
           }
         }
 
-        return set(data, finalPath, $this.inlineParsing ? $this.schema.schemaAtPath(finalPath).parse(value, { state }) : value)
+        return set(data, finalPath, value)
       }
     })
 

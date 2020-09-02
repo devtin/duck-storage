@@ -32,21 +32,26 @@ const AdvancedSchema = new Schema({
   }
 })
 
-test('validates properties in realtime', t => {
-  const duckModel = Duck.create({ schema: AdvancedSchema })
+test('validates properties at consolidation', async t => {
+  const duckModel = await Duck.create({ schema: AdvancedSchema })
   let err
 
   err = t.throws(() => { return duckModel.dont.do.this.to.me })
+
   t.is(err.message, 'Unknown property dont')
 
-  err = t.throws(() => { duckModel.firstName = 123 })
-  t.is(err.message, 'Invalid string')
+  t.notThrows(() => { duckModel.firstName = 123 })
+  t.notThrows(() => { duckModel.address.zip = '33q29' })
+  t.notThrows(() => { duckModel.email = 'martin' })
 
-  err = t.throws(() => { duckModel.address.zip = '33q29' })
-  t.is(err.message, 'Invalid number')
+  err = await t.throwsAsync(() => duckModel.consolidate())
 
-  err = t.throws(() => { duckModel.email = 'martin' })
-  t.is(err.message, 'Invalid e-mail address')
+  t.is(err.message, 'Data is not valid')
+  t.is(err.errors.length, 4)
+  t.is(err.errors[0].message, 'Invalid string')
+  t.is(err.errors[1].message, 'Invalid e-mail address')
+  t.is(err.errors[2].message, 'Property address.line1 is required')
+  t.is(err.errors[3].message, 'Invalid number')
 
   t.notThrows(() => { duckModel.firstName = 'Martin' })
   t.notThrows(() => { duckModel.lastName = 'Rafael' })
@@ -63,12 +68,12 @@ test('validates properties in realtime', t => {
   err = t.throws(() => duckModel.getEmailDomain())
   t.is(err.message, 'consolidate the model prior invoking method getEmailDomain')
 
-  duckModel.consolidate()
+  await duckModel.consolidate()
 
   t.truthy(duckModel._id)
-  t.is(duckModel.getEmailDomain(), 'devtin.io')
+  t.is(await duckModel.getEmailDomain(), 'devtin.io')
 
-  t.deepEqual(duckModel.toObject(), {
+  t.deepEqual(await duckModel.toObject(), {
     _id: duckModel._id,
     _v: 1,
     firstName: 'Martin',

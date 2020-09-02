@@ -1,8 +1,8 @@
 import test from 'ava'
 import { registerDuckRacksFromObj } from './register-duck-racks-from-obj'
 
-test('register multiple ducks from an object mapping duck-models', t => {
-  const duckRacks = registerDuckRacksFromObj({
+test('register multiple ducks from an object mapping duck-models', async t => {
+  const duckRacks = await registerDuckRacksFromObj({
     user: {
       duckModel: {
         schema: {
@@ -25,10 +25,10 @@ test('register multiple ducks from an object mapping duck-models', t => {
   })
 
   t.true(Array.isArray(duckRacks))
-  const userModel = duckRacks[0].duckModel.getModel()
+  const userModel = await duckRacks[0].duckModel.getModel()
   userModel.fullName = 'Martin'
   userModel.password = '123'
-  userModel.consolidate()
+  await t.notThrowsAsync(() => userModel.consolidate())
   userModel.log('yup')
   t.deepEqual(userModel.logs, ['yup'])
   t.snapshot(duckRacks)

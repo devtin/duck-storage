@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.16
+ * duck-storage v0.0.17
  * (c) 2020 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */

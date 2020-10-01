@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.17](https://github.com/devtin/duck-storage/compare/v0.0.14...v0.0.17) (2020-10-01)
+
+
+### Features
+
+* improve object modification detection ([e1eee94](https://github.com/devtin/duck-storage/commit/e1eee94c30613eba70cfd3360b28257e699498b0))
+
+
+### Bug Fixes
+
+* discard tests scripts ([0249862](https://github.com/devtin/duck-storage/commit/0249862c2834003334433495276e5dcbddcd112b))
+
 ### [0.0.14](https://github.com/devtin/duck-storage/compare/v0.0.13...v0.0.14) (2020-08-28)
 
 

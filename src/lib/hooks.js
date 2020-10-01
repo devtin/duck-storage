@@ -9,7 +9,7 @@ export class Hooks {
     this.hooks.push({ lifeCycle, hookName, cb })
   }
 
-  async trigger (thisArg, lifeCycle, hookName, payload) {
+  async trigger (thisArg, lifeCycle, hookName, payload, rollback = []) {
     const hooksMatched = this
       .hooks
       .filter(({ hookName: givenHookName, lifeCycle: givenLifeCycle }) => {
@@ -19,13 +19,12 @@ export class Hooks {
 
     for (const cb of hooksMatched) {
       try {
-        payload = await cb.call(thisArg, payload)
+        await cb.call(thisArg, payload, rollback)
       } catch (error) {
         // todo: throw hook error
+        await Promise.all(rollback)
         throw new ErrorHook(error.message, { hookName, lifeCycle, error })
       }
     }
-
-    return payload
   }
 }

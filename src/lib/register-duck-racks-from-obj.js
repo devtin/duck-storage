@@ -12,7 +12,8 @@ import Promise from 'bluebird'
 export async function registerDuckRacksFromObj (duckRacks) {
   return Promise.map(Object.keys(duckRacks), async (rackName) => {
     const { duckModel, methods } = duckRacks[rackName]
-    const schema = new Schema(duckModel.schema, { methods: duckModel.methods })
+
+    const schema = duckModel instanceof Schema ? duckModel : new Schema(duckModel.schema, { methods: duckModel.methods || {} })
     const duckRack = await new DuckRack(rackName, { duckModel: new Duck({ schema }), methods })
     return DuckStorage.registerRack(duckRack)
   })

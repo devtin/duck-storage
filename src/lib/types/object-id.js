@@ -6,7 +6,7 @@ Transformers.ObjectId = {
   settings: {
     unique: true
   },
-  parse (v, { state }) {
+  async parse (v, { state }) {
     if (ObjectId.isValid(v)) {
       return ObjectId(v).toHexString()
     }
@@ -19,8 +19,10 @@ Transformers.ObjectId = {
 
       const rawData = Object.assign({}, v)
 
+      // todo: check if consolidated instead if is valid
+      //       or maybe make isValid check if raw data is consolidated? :\
       if (
-        DuckStorage.getRackByName(this.settings.rack).duckModel.schema.isValid(rawData)
+        await DuckStorage.getRackByName(this.settings.rack).duckModel.schema.isValid(rawData)
       ) {
         if (state.method === 'create') {
           return ObjectId(v._id).toHexString()
@@ -31,10 +33,10 @@ Transformers.ObjectId = {
     }
     return v
   },
-  validate (v) {
+  async validate (v) {
     if (
       this.settings.duckRack &&
-        DuckStorage.getRackByName(this.settings.duckRack).duckModel.schema.isValid(v)
+        await DuckStorage.getRackByName(this.settings.duckRack).duckModel.schema.isValid(v)
     ) {
       return
     }

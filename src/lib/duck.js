@@ -98,8 +98,8 @@ export class Duck extends EventEmitter {
     let data = {}
     let consolidated = await this.schema.isValid(defaultValues)
 
-    const consolidate = async () => {
-      data = await this.schema.parse(data, { virtualsEnumerable: false })
+    const consolidate = async ({ virtualsEnumerable = false } = {}) => {
+      data = await this.schema.parse(data, { virtualsEnumerable })
       consolidated = true
       return data
     }

@@ -22,7 +22,7 @@ export default function ({ DuckStorage, duckRack }) {
     return entry
   }
 
-  duckRack.hook('before', 'create', encryptPasswords)
+  duckRack.hook('before', 'create', ({ entry }) => encryptPasswords(entry))
   duckRack.hook('before', 'update', async function ({ oldEntry, newEntry, entry }) {
     const toHash = []
     obj2dot(newEntry).forEach((path) => {

@@ -24,7 +24,7 @@ let ContactModel
 
 let Rack
 
-test.beforeEach(async () => {
+test.before(async () => {
   Address = new Schema({
     line1: String,
     line2: String,
@@ -59,7 +59,9 @@ test.beforeEach(async () => {
   Rack = await new DuckRack('some-rack-name', {
     duckModel: ContactModel
   })
+})
 
+test.beforeEach(async () => {
   return Rack.delete({})
 })
 
@@ -93,7 +95,7 @@ test('finds a duck', async t => {
 
   const found = await Rack.read(entry._id)
 
-  t.deepEqual(await entry.toObject(), await found.toObject())
+  t.deepEqual(entry, found)
   t.not(entry, found)
 })
 
@@ -112,7 +114,7 @@ test('updates information of a duck', async t => {
   const updatePayload = (await updateEvent)[0]
 
   t.truthy(updatePayload)
-  t.deepEqual(updatePayload.oldEntry, await created.toObject())
+  t.deepEqual(updatePayload.oldEntry, created)
   t.deepEqual(updatePayload.newEntry, toUpdate)
   t.deepEqual(updatePayload.entry, updated[0])
 
@@ -163,14 +165,11 @@ test('updates information of multiple ducks at a time', async t => {
 
   t.truthy(updatePayload)
 
-  const martinObj = await martin.toObject()
-  const anaObj = await ana.toObject()
-
-  t.deepEqual(updatePayload[0].oldEntry, martinObj)
+  t.deepEqual(updatePayload[0].oldEntry, martin)
   t.deepEqual(updatePayload[0].newEntry, toUpdate)
   t.deepEqual(updatePayload[0].entry, updated[0])
 
-  t.deepEqual(updatePayload[1].oldEntry, anaObj)
+  t.deepEqual(updatePayload[1].oldEntry, ana)
   t.deepEqual(updatePayload[1].newEntry, toUpdate)
   t.deepEqual(updatePayload[1].entry, updated[1])
 })
@@ -215,14 +214,11 @@ test('lists ducks in the rack', async t => {
   const res = await Rack.list()
   t.true(Array.isArray(res))
   t.is(res.length, 2)
-  const resObj = await Promise.map(res, async item => {
-    return item.toObject()
-  })
-  t.deepEqual(resObj, [await entry1.toObject(), await entry2.toObject()])
+  t.deepEqual(res, [entry1, entry2])
 })
 
 test('sorts ducks in a rack by custom properties', async t => {
-  const ana = await (await Rack.create({
+  const ana = await Rack.create({
     firstName: 'Ana',
     lastName: 'Sosa',
     address: {
@@ -230,9 +226,9 @@ test('sorts ducks in a rack by custom properties', async t => {
       line2: 'Miami',
       zip: 33129
     }
-  })).toObject()
+  })
 
-  const olivia = await (await Rack.create({
+  const olivia = await Rack.create({
     firstName: 'Olivia',
     lastName: 'Gonzalez',
     address: {
@@ -240,9 +236,9 @@ test('sorts ducks in a rack by custom properties', async t => {
       line2: 'Miami',
       zip: 33129
     }
-  })).toObject()
+  })
 
-  const martin = await (await Rack.create({
+  const martin = await Rack.create({
     firstName: 'Martin',
     lastName: 'Gonzalez',
     address: {
@@ -250,9 +246,9 @@ test('sorts ducks in a rack by custom properties', async t => {
       line2: 'Miami',
       zip: 33129
     }
-  })).toObject()
+  })
 
-  const ruth = await (await Rack.create({
+  const ruth = await Rack.create({
     firstName: 'Ruth',
     lastName: 'Marquez',
     address: {
@@ -260,35 +256,35 @@ test('sorts ducks in a rack by custom properties', async t => {
       line2: 'Kendall',
       zip: 33196
     }
-  })).toObject()
+  })
 
   const res = await Rack.list({}, {
     firstName: -1
   })
 
-  t.deepEqual(await Promise.map(res, entry => entry.consolidate()), [ruth, olivia, martin, ana])
+  t.deepEqual(res, [ruth, olivia, martin, ana])
 
   const res2 = await Rack.list({}, {
     lastName: -1,
     firstName: 1
   })
 
-  t.deepEqual(await Promise.map(res2, entry => entry.consolidate()), [ana, ruth, martin, olivia])
+  t.deepEqual(res2, [ana, ruth, martin, olivia])
 
-  const res3 = await Promise.map(await Rack.list({}, {
+  const res3 = await Rack.list({}, {
     address: {
       zip: -1
     }
-  }), entry => entry.consolidate())
+  })
 
   t.deepEqual(res3, [ruth, ana, olivia, martin])
 
-  const res4 = await Promise.map(await Rack.list({}, {
+  const res4 = await Rack.list({}, {
     address: {
       line2: 1
     },
     firstName: 1
-  }), entry => entry.consolidate())
+  })
 
   t.deepEqual(res4, [ruth, ana, martin, olivia])
 })
@@ -354,10 +350,10 @@ test('loads references of ducks in other racks', async t => {
     amount: 100
   })
 
-  t.deepEqual(order.customer, await customer.toObject())
+  t.deepEqual(order.customer, customer)
 
   const readOrder = await OrderRack.read(order._id)
-  t.deepEqual(readOrder.customer, await customer.toObject())
+  t.deepEqual(readOrder.customer, customer)
 })
 
 test('defines duck rack methods', async t => {
@@ -425,4 +421,70 @@ test('defines duck rack methods', async t => {
     userId: admins[0]._id,
     newLevel: 'user'
   }))
+})
+
+test('apply calls a method in the model and mutates the state if everything goes smooth', async t => {
+  const User = new Schema({
+    firstName: String,
+    lastName: String,
+    logs: {
+      type: Array,
+      default () {
+        return []
+      }
+    }
+  }, {
+    methods: {
+      log: {
+        input: String,
+        events: {
+          logAdded: {
+            date: Date,
+            log: String
+          }
+        },
+        handler (log) {
+          const logToAdd = {
+            date: new Date(),
+            log
+          }
+          this.$field.logs.push(logToAdd)
+          this.$emit('logAdded', logToAdd)
+          return this.$field.logs
+        }
+      }
+    }
+  })
+
+  const UserDuck = new Duck({ schema: User })
+  const UserRack = await new DuckRack('user', { duckModel: UserDuck })
+
+  const martin = await UserRack.create({
+    firstName: 'Martin',
+    lastName: 'Gonzalez'
+  })
+
+  let eventCalled = false
+
+  UserRack.on('method', ({ event, entry, payload }) => {
+    eventCalled = true
+    t.is(event, 'logAdded')
+    t.truthy(entry)
+    t.truthy(payload)
+  })
+
+  const response = await UserRack.apply({
+    id: martin._id,
+    method: 'log',
+    payload: 'some log'
+  })
+
+  t.truthy(response.methodResult)
+  t.truthy(response.entryResult)
+  t.truthy(response.eventsDispatched)
+
+  const updatedMartin = await UserRack.read(martin._id)
+  t.is(updatedMartin.logs[0].log, 'some log')
+  t.is(updatedMartin._v, 2)
+  t.true(eventCalled)
 })

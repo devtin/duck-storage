@@ -2,7 +2,7 @@ import { Utils } from 'duckfficer'
 import set from 'lodash/set'
 
 export default function ({ DuckStorage, duckRack }) {
-  async function loadReferences (entry) {
+  async function loadReferences ({ entry }) {
     const entriesToLoad = this.duckModel
       .schema
       .paths
@@ -20,7 +20,7 @@ export default function ({ DuckStorage, duckRack }) {
       set(entry, entryToLoad.path, await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id))
     }
 
-    return entry
+    return { entry }
   }
 
   duckRack.hook('after', 'read', loadReferences)

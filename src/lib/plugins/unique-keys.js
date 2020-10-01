@@ -13,7 +13,7 @@ export default function ({ DuckStorage, duckRack }) {
     }
   })
 
-  async function checkPrimaryKeys (entry) {
+  async function checkPrimaryKeys ({ entry } = {}) {
     const $or = []
     Object.keys(keys).forEach(keyName => {
       const $and = []
@@ -35,13 +35,11 @@ export default function ({ DuckStorage, duckRack }) {
       })
       throw new Error(`primary keys (${failingKeys.join(', ')}) failed for document`)
     }
-
-    return entry
   }
 
   duckRack.hook('before', 'create', checkPrimaryKeys)
   duckRack.hook('before', 'update', async ({ oldEntry, newEntry, entry }) => {
-    await checkPrimaryKeys(entry)
+    await checkPrimaryKeys({ entry })
     return {
       oldEntry,
       newEntry,

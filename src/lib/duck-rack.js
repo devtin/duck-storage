@@ -12,6 +12,34 @@ import './types/query.js'
 import { Methods } from './schemas/method.js'
 import { Hooks } from './hooks'
 
+// todo: describe the duck proxy
+
+/**
+ * @typedef {Object} DuckProxy
+ * @return {boolean}
+ */
+
+/**
+ * Returns true when objB does not match objA
+ * @param {Object} objA
+ * @param {Object} objB
+ * @return {boolean}
+ */
+const objectHasBeenModified = (objA, objB) => {
+  const diff = detailedDiff(objA, objB)
+  let modified = false
+  Object.keys(diff).forEach((key) => {
+    Object.keys(diff[key]).forEach(prop => {
+      if (modified) {
+        return
+      }
+
+      modified = Object.keys(diff[key][prop]).length > 0
+    })
+  })
+  return modified
+}
+
 class DuckRackError extends Error {
   constructor (message, error) {
     super(message)

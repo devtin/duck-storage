@@ -12,6 +12,12 @@ const BooleanOrSchema = new Schema({
 })
 
 export const Meth = new Schema({
+  data: {
+    type: Object,
+    default () {
+      return {}
+    }
+  },
   description: {
     type: String,
     required: false

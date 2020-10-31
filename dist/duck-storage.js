@@ -13,11 +13,12 @@ var duckfficer = require('duckfficer');
 var set = require('lodash/set');
 var get = require('lodash/get');
 var deepObjectDiff = require('deep-object-diff');
-var sift = require('sift');
 var camelCase = require('lodash/camelCase');
 var kebabCase = require('lodash/kebabCase');
 var cloneDeep = require('lodash/cloneDeep');
+var defaults = require('lodash/defaults');
 var Promise$1 = require('bluebird');
+var bcrypt = require('bcrypt');
 var jsDirIntoJson = require('js-dir-into-json');
 
 function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
@@ -46,11 +47,12 @@ var R__default = /*#__PURE__*/_interopDefaultLegacy(R);
 var duckfficer__namespace = /*#__PURE__*/_interopNamespace(duckfficer);
 var set__default = /*#__PURE__*/_interopDefaultLegacy(set);
 var get__default = /*#__PURE__*/_interopDefaultLegacy(get);
-var sift__default = /*#__PURE__*/_interopDefaultLegacy(sift);
 var camelCase__default = /*#__PURE__*/_interopDefaultLegacy(camelCase);
 var kebabCase__default = /*#__PURE__*/_interopDefaultLegacy(kebabCase);
 var cloneDeep__default = /*#__PURE__*/_interopDefaultLegacy(cloneDeep);
+var defaults__default = /*#__PURE__*/_interopDefaultLegacy(defaults);
 var Promise__default = /*#__PURE__*/_interopDefaultLegacy(Promise$1);
+var bcrypt__default = /*#__PURE__*/_interopDefaultLegacy(bcrypt);
 
 const getLockSkip = R__default['default'].path(['lock', 'skip']);
 const isObj = v => {
@@ -134,79 +136,6 @@ function lock ({ lockTimeout = 3000 } = {}) {
       duckRack.unlock(_id);
     });
   }
-}
-
-function loadReference ({ DuckStorage, duckRack }) {
-  async function loadReferences ({ entry }) {
-    const entriesToLoad = this.duckModel
-      .schema
-      .paths
-      .filter((path) => {
-        return this.duckModel.schema.schemaAtPath(path).settings.duckRack && duckfficer.Utils.find(entry, path)
-      })
-      .map(path => {
-        const Rack = DuckStorage.getRackByName(this.duckModel.schema.schemaAtPath(path).settings.duckRack);
-        const _idPayload = duckfficer.Utils.find(entry, path);
-        const _id = Rack.duckModel.schema.isValid(_idPayload) ? _idPayload._id : _idPayload;
-        return { duckRack: this.duckModel.schema.schemaAtPath(path).settings.duckRack, _id, path }
-      });
-
-    for (const entryToLoad of entriesToLoad) {
-      set__default['default'](entry, entryToLoad.path, await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id));
-    }
-
-    return { entry }
-  }
-
-  duckRack.hook('after', 'read', loadReferences);
-  duckRack.hook('after', 'create', loadReferences);
-}
-
-function uniqueKeys ({ DuckStorage, duckRack }) {
-  const keys = {};
-  duckRack.duckModel.schema.children.forEach(schema => {
-    if (schema.settings.unique) {
-      const keyName = typeof schema.settings.unique === 'boolean' ? schema.fullPath : schema.settings.unique;
-      if (!keys[keyName]) {
-        keys[keyName] = [];
-      }
-      keys[keyName].push(schema.fullPath);
-    }
-  });
-
-  async function checkPrimaryKeys ({ entry } = {}) {
-    const $or = [];
-    Object.keys(keys).forEach(keyName => {
-      const $and = [];
-      keys[keyName].forEach(propName => {
-        $and.push({ [propName]: { $eq: get__default['default'](entry, propName, undefined) } });
-      });
-      $or.push({ $and });
-    });
-
-    const found = await duckRack.find({ $or });
-
-    if (found.length > 0 && found[0]._id !== entry._id) {
-      // check which keys failed
-      const failingEntry = found[0];
-      const failingKeys = Object.keys(keys).filter(keyId => {
-        const props = keys[keyId];
-        const matchingKey = get__default['default'](failingEntry, props);
-        return Object.keys(deepObjectDiff.diff(matchingKey, get__default['default'](entry, props))).length === 0
-      });
-      throw new Error(`primary keys (${failingKeys.join(', ')}) failed for document`)
-    }
-  }
-
-  duckRack.hook('before', 'create', checkPrimaryKeys);
-  duckRack.hook('before', 'update', async ({ oldEntry, newEntry, entry }) => {
-    await checkPrimaryKeys({ entry });
-    return {
-      oldEntry,
-      newEntry,
-      entry
-    }
-  });
 }
 
 var MACHINE_ID = Math.floor(Math.random() * 0xFFFFFF);
@@ -433,34 +362,213 @@ ObjectID.prototype[inspect] = function() { return "ObjectID("+this+")" };
 ObjectID.prototype.toJSON = ObjectID.prototype.toHexString;
 ObjectID.prototype.toString = ObjectID.prototype.toHexString;
 
+function loadReference ({ DuckStorage, duckRack }) {
+  const getReferences = (duckModel, entry) => {
+    return duckModel
+      .schema
+      .paths
+      .filter((path) => {
+        return duckModel.schema.schemaAtPath(path).settings.duckRack && duckfficer.Utils.find(entry, path)
+      })
+      .map(path => {
+        const _idPayload = duckfficer.Utils.find(entry, path);
+        const _id = typeof _idPayload === 'object' && !objectid.isValid(_idPayload) ? _idPayload._id : _idPayload;
+        return { duckRack: duckModel.schema.schemaAtPath(path).settings.duckRack, _id, path }
+      })
+  };
+  async function checkReferencesExists ({ entry }) {
+    const entriesToLoad = getReferences(this.duckModel, entry);
+
+    for (const entryToLoad of entriesToLoad) {
+      const reference = await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id);
+      if (reference === undefined) {
+        throw new Error(`Could not find reference '${entryToLoad._id}' in rack '${entryToLoad.duckRack}'`)
+      }
+    }
+  }
+
+  async function loadReferences ({ entry, state }) {
+    const entriesToLoad = getReferences(this.duckModel, entry);
+
+    for (const entryToLoad of entriesToLoad) {
+      set__default['default'](entry, entryToLoad.path, await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id));
+    }
+  }
+
+  duckRack.hook('after', 'read', loadReferences);
+  duckRack.hook('after', 'create', loadReferences);
+  duckRack.hook('before', 'create', checkReferencesExists);
+}
+
+function uniqueKeys ({ DuckStorage, duckRack }) {
+  const keys = {};
+  duckRack.duckModel.schema.children.forEach(schema => {
+    if (schema.settings.unique) {
+      const keyName = typeof schema.settings.unique === 'boolean' ? schema.fullPath : schema.settings.unique;
+      if (!keys[keyName]) {
+        keys[keyName] = [];
+      }
+      keys[keyName].push(schema.fullPath);
+    }
+  });
+
+  async function checkPrimaryKeys ({ entry } = {}) {
+    const $or = [];
+    Object.keys(keys).forEach(keyName => {
+      const $and = [];
+      keys[keyName].forEach(propName => {
+        $and.push({ [propName]: { $eq: get__default['default'](entry, propName, undefined) } });
+      });
+      $or.push({ $and });
+    });
+
+    const found = await duckRack.find({ $or });
+
+    if (found.length > 0 && !objectid(found[0]._id).equals(entry._id)) {
+      // check which keys failed
+      const failingEntry = found[0];
+      const failingKeys = Object.keys(keys).filter(keyId => {
+        const props = keys[keyId];
+        const matchingKey = get__default['default'](failingEntry, props);
+        return Object.keys(deepObjectDiff.diff(matchingKey, get__default['default'](entry, props))).length === 0
+      });
+      throw new Error(`primary keys (${failingKeys.join(', ')}) failed for document`)
+    }
+  }
+
+  duckRack.hook('before', 'create', checkPrimaryKeys);
+  duckRack.hook('before', 'update', async ({ oldEntry, newEntry, entry }) => {
+    await checkPrimaryKeys({ entry });
+    return {
+      oldEntry,
+      newEntry,
+      entry
+    }
+  });
+}
+
+// const primitiveValues = [Number, BigInt, String, Object, Array, Boolean, Date]
+// const scalableValues = [Number, BigInt, Date]
+
+const SortSchema = new duckfficer.Schema({
+  type: Object
+});
+
+const Sort = {
+  settings: {
+    required: false,
+    autoCast: true
+  },
+  isSort (o) {
+    return Object.keys(o).filter(item => /^\$/.test(item)).length > 0
+  },
+  cast (v, payload) {
+    if (typeof v === 'string') {
+      try {
+        return JSON.parse(v)
+      } catch (err) {}
+    }
+    return v
+  },
+  parse (v) {
+    if (!Sort.isSort(v)) {
+      if (Object.keys(v).length === 0) {
+        return v
+      }
+
+      return new duckfficer.Schema({ type: Object, mapSchema: 'Query' }, {
+        name: this.name,
+        parent: this instanceof duckfficer.Schema ? this : undefined
+      }).parse(v)
+    }
+
+    const operator = Object.keys(v)[0];
+
+    if (!SortSchema.hasField(operator)) {
+      const err = `Unknown operator ${operator}`;
+      if (this.throwError) {
+        this.throwError(err);
+      }
+      throw new Error(err)
+    }
+
+    // console.log(`looking for schema at`, this.fullPath, operator, QuerySchema.schemaAtPath(operator))
+    return {
+      [operator]: duckfficer.Schema.cloneSchema({
+        schema: SortSchema.schemaAtPath(operator),
+        name: `${this.fullPath}.${operator}`,
+        parent: this instanceof duckfficer.Schema ? this : undefined
+      }).parse(v[operator])
+    }
+  },
+  validate (v, { state }) {
+    if (v && Sort.isSort(v) && Object.keys(v).length > 1) {
+      this.throwError('Invalid sorter');
+    }
+  }
+};
+
+duckfficer.Transformers.Sort = Sort;
+
+duckfficer.Transformers.Password = {
+  settings: {
+    emptyPasswordError: 'Please enter a valid password'
+  },
+  loaders: [
+    {
+      type: [
+        {
+          type: String,
+          allowEmpty: false,
+          emptyError: 'Please enter a password'
+        }
+      ]
+    }
+  ],
+  validate (value) {
+    if (value === '' || value === undefined) {
+      this.throwError(this.settings.emptyPasswordError, { value });
+    }
+  },
+  // todo: add option to compare with old object
+  parse (v, { state }) {
+    if (
+      state.method === 'create' ||
+      (
+        state.method === 'update' &&
+        duckfficer.Utils.find(state.oldEntry || {}, this.fullPath) !== v
+      )
+    ) {
+      return bcrypt__default['default'].hash(v, 10)
+    }
+    return v
+  }
+};
+
 duckfficer.Transformers.ObjectId = {
   settings: {
     unique: true
   },
   async parse (v, { state }) {
     if (objectid.isValid(v)) {
-      return objectid(v).toHexString()
+      return objectid(v)
     }
 
     // TODO: filter (tree shake) at build
-    if (this.settings.rack) {
-      if (!DuckStorage.getRackByName(this.settings.rack)) {
-        this.throwError(`Could not find rack '${this.settings.rack}'`);
+    if (this.settings.duckRack) {
+      if (!DuckStorage.getRackByName(this.settings.duckRack)) {
+        this.throwError(`Could not find rack '${this.settings.duckRack}'`);
       }
 
       const rawData = Object.assign({}, v);
 
       // todo: check if consolidated instead if is valid
       //       or maybe make isValid check if raw data is consolidated? :\
-      if (
-        await DuckStorage.getRackByName(this.settings.rack).duckModel.schema.isValid(rawData)
-      ) {
-        if (state.method === 'create') {
-          return objectid(v._id).toHexString()
-        }
-
-        return rawData
+      if (state.method === 'create' || state.method === 'update') {
+        return objectid(v._id)
       }
+
+      return rawData
     }
     return v
   },
@@ -531,6 +639,8 @@ const QuerySchema = new duckfficer.Schema({
     arraySchema: 'Query'
   },
   // element query
+  $where: Object,
+  $elemMatch: Object,
   $exists: Boolean,
   $type: {
     type: Function
@@ -597,6 +707,12 @@ const BooleanOrSchema = new duckfficer.Schema({
 });
 
 const Meth = new duckfficer.Schema({
+  data: {
+    type: Object,
+    default () {
+      return {}
+    }
+  },
   description: {
     type: String,
     required: false
@@ -721,12 +837,6 @@ class MethodError extends Error {
   }
 }
 
-const { forEach } = duckfficer.Utils;
-
-const Query$1 = new duckfficer.Schema({
-  type: 'Query'
-});
-
 /**
  * @class DuckRack
  * @classdesc Stores only ducks specified by the `duckModel`
@@ -814,10 +924,6 @@ class DuckRack extends events.EventEmitter {
     return this.duckModel.schema
   }
 
-  static runQuery (entity, query) {
-    return entity.filter(sift__default['default'](query))
-  }
-
   /**
    * Retrieves document by `id` and executes given `method` if found, with given payload. Saves the state of the entry
    * once done
@@ -827,25 +933,40 @@ class DuckRack extends events.EventEmitter {
    * @param {Object} state
    * @param {Number} _v - dot notation path
    * @param {String} path - dot notation path
+   * @param {Function} validate - validator function that receives the document
    * @param {*} payload
    * @return {Promise<*>}
    */
-  async apply ({ id, _v, path = null, method, payload, state = {} }) {
+  async apply ({ id, _v, path = null, method, payload, state = {}, validate }) {
+    defaults__default['default'](state, {
+      method: 'apply'
+    });
+
+    const getQuery = () => {
+      if (_v) {
+        return {
+          _id: objectid(id),
+          _v: {
+            $eq: _v
+          }
+        }
+      }
+      return id
+    };
+
     await this.trigger('before', 'apply', { id, _v, method, path, payload, state });
 
-    const query = _v ? {
-      _id: {
-        $eq: id
-      },
-      _v: {
-        $eq: _v
-      }
-    } : id;
+    const query = getQuery();
 
     const doc = (await this.find(query))[0];
 
     if (!doc) {
       throw new Error('document not found')
+    }
+
+    if (validate) {
+      // custom doc validation
+      await validate(doc);
     }
 
     let error;
@@ -888,7 +1009,7 @@ class DuckRack extends events.EventEmitter {
     Object.keys(methodEvents).forEach(eventTrapper.trap);
 
     try {
-      methodResult = await docAtPath[method](payload);
+      methodResult = await docAtPath[method](payload, { state });
     } catch (err) {
       error = new MethodError(err.message);
     }
@@ -925,28 +1046,23 @@ class DuckRack extends events.EventEmitter {
       throw new Error('An entry must be provided')
     }
 
+    defaults__default['default'](state, {
+      method: 'create'
+    });
+
     DuckRack.validateEntryVersion(newEntry);
 
-    const { store, storeKey } = this;
+    const entry = await this.schema.parse(newEntry, { state, virtualsEnumerable: false });
 
-    /*
-    if (newEntry._id && await this.entryExists(newEntry._id)) {
-      throw new Error(`Entry ${newEntry._id} already exists`)
-    }
-*/
-
-    const entry = await this.schema.parse(newEntry, { state: { method: 'create' }, virtualsEnumerable: false });
+    Object.assign(state, {
+      entryProcessed: false
+    });
 
     await this.trigger('before', 'create', { entry, state });
-
-    storeKey[entry._id] = entry;
-    store.push(entry);
-
-    const entryModel = await this.duckModel.getModel(entry);
-
+    const entryModel = await this.duckModel.getModel(entry, state);
     const createdEntry = await entryModel.consolidate();
     await this.trigger('after', 'create', { entry: createdEntry, state });
-    this.emit('create', createdEntry);
+    this.emit('create', { entry: createdEntry, state });
 
     return createdEntry
   }
@@ -958,10 +1074,16 @@ class DuckRack extends events.EventEmitter {
    * @return {Promise<*>}
    */
   async read (_id, state = {}) {
+    defaults__default['default'](state, {
+      method: 'read'
+    });
+
     const entry = await this.findOneById(_id);
     if (entry) {
       await this.trigger('before', 'read', { entry, state });
-      const recoveredEntry = await this.duckModel.schema.parse(cloneDeep__default['default'](entry));
+      const recoveredEntry = await this.duckModel.schema.parse(cloneDeep__default['default'](entry), {
+        state
+      });
       await this.trigger('after', 'read', { entry: recoveredEntry, state });
 
       return recoveredEntry
@@ -982,8 +1104,12 @@ class DuckRack extends events.EventEmitter {
    */
 
   async update (query, newEntry, state = {}) {
-    const entries = (await this.find(query, {}, true)).map(oldEntry => {
-      if (newEntry && newEntry._id && oldEntry._id !== newEntry._id) {
+    defaults__default['default'](state, {
+      method: 'update'
+    });
+
+    const entries = (await this.find(query, state, true)).map(oldEntry => {
+      if (newEntry && newEntry._id && !objectid(oldEntry._id).equals(newEntry._id)) {
         throw new Error('_id\'s cannot be modified')
       }
 
@@ -994,22 +1120,32 @@ class DuckRack extends events.EventEmitter {
       return oldEntry
     });
 
+    const newEntries = [];
+
     for (const oldEntry of entries) {
-      const entry = await this.schema.parse(Object.assign(cloneDeep__default['default'](oldEntry), newEntry), { state: { method: 'update', oldEntry } });
+      Object.assign(state, { oldEntry });
+      const composedNewEntry = Object.assign(cloneDeep__default['default'](oldEntry), newEntry);
+
+      const entry = await this.schema.parse(composedNewEntry, { state });
 
       if (!objectHasBeenModified(oldEntry, entry)) {
+        newEntries.push(oldEntry);
         continue
       }
 
-      entry._v = oldEntry._v + 1;
+      newEntry._v = entry._v = oldEntry._v + 1;
+      const result = [];
 
-      await this.trigger('before', 'update', { oldEntry, newEntry, entry, state });
-      this.emit('update', { oldEntry: Object.assign({}, oldEntry), newEntry, entry });
-      Object.assign(oldEntry, entry);
-      await this.trigger('after', 'update', { oldEntry, newEntry, entry, state });
+      await this.trigger('before', 'update', { oldEntry, newEntry, entry, state, result });
+      this.emit('update', { oldEntry, newEntry, entry });
+      await this.trigger('after', 'update', { oldEntry, newEntry, entry, state, result });
+
+      if (result.length > 0) {
+        newEntries.push(...result);
+      }
     }
 
-    return entries
+    return Promise__default['default'].map(newEntries, entry => this.schema.parse(entry))
   }
 
   /**
@@ -1026,46 +1162,49 @@ class DuckRack extends events.EventEmitter {
    */
 
   async delete (query, state = {}) {
-    const entity = this.store;
-    const removedEntries = entity.filter(sift__default['default'](query));
+    defaults__default['default'](state, {
+      method: 'delete'
+    });
 
-    for (const entry of removedEntries) {
-      await this.trigger('before', 'delete', { entry, state });
-      this.deleteById(entry._id);
-      this.emit('delete', entry);
-      await this.trigger('after', 'delete', { entry, state });
+    await this.trigger('before', 'deleteMultiple', { query, state });
+
+    const entriesToRemove = await this.find(query);
+    const removedEntries = [];
+
+    for (const entry of entriesToRemove) {
+      if (await this.deleteById(entry._id)) {
+        removedEntries.push(entry);
+        this.emit('delete', entry);
+      }
     }
+
+    await this.trigger('after', 'deleteMultiple', { query, result: removedEntries, state });
 
     return removedEntries
   }
 
-  deleteById (_id) {
+  async deleteById (_id, state = {}) {
     this.validateId(_id);
-    let foundIndex = null;
-
-    forEach(this.store, (item, i) => {
-      if (item._id === _id) {
-        foundIndex = i;
-        return false
-      }
+    defaults__default['default'](state, {
+      method: 'deleteById'
     });
 
-    const foundEntry = this.storeKey[_id];
+    const result = [];
 
-    if (foundEntry) {
-      delete this.storeKey[_id];
-    }
+    await this.trigger('before', 'deleteById', { _id, state, result });
+    await this.trigger('after', 'deleteById', { _id, state, result });
 
-    if (foundIndex !== null) {
-      this.store.splice(foundIndex, 1);
-    }
+    return result[0]
   }
 
-  async list (query, sort) {
-    const entries = await Promise__default['default'].map(query ? await this.find(query) : this.store, async value => {
-      const entry = await this.duckModel.getModel(value);
-      const foundEntry = await entry.consolidate();
-      return foundEntry
+  async list (query, sort, state = {}) {
+    defaults__default['default'](state, {
+      method: 'list'
+    });
+
+    const entries = await Promise__default['default'].map(await this.find(query, state), async value => {
+      const entry = await this.duckModel.getModel(value, state);
+      return entry.consolidate()
     });
 
     if (!sort) {
@@ -1115,34 +1254,42 @@ class DuckRack extends events.EventEmitter {
   }
 
   async findOneById (_id, state = {}, raw) {
-    await this.trigger('before', 'findOneById', { _id, state });
+    defaults__default['default'](state, {
+      method: 'findOneById'
+    });
 
     const queryInput = {
-      _id: {
-        $eq: _id
-      }
+      _id: objectid(_id)
     };
 
-    const theQuery = await Query$1.parse(queryInput);
+    const result = [];
 
-    // cloneDeep is meant to prevent the memory store object being mutated
-    const result = cloneDeep__default['default']((await DuckRack.runQuery(this.store, theQuery))[0]);
+    // todo: remove before / after states as they may not be needed any more
+    await this.trigger('before', 'findOneById', { _id, queryInput, state, result });
 
-    await this.trigger('after', 'findOneById', { _id, result });
-    return result
+    await this.trigger('after', 'findOneById', { _id, queryInput, result, state });
+    return result[0]
   }
 
-  async find (queryInput, state = {}, raw = false) {
+  // todo: add limits
+  async find (queryInput = {}, state = {}, raw = false) {
+    defaults__default['default'](state, {
+      method: 'find'
+    });
+
     // todo: run hooks
-    if (typeof queryInput !== 'object') {
+    if (objectid.isValid(queryInput)) {
       queryInput = {
-        _id: {
-          $eq: queryInput
-        }
+        _id: objectid(queryInput)
       };
     }
 
-    return Promise__default['default'].map(DuckRack.runQuery(this.store, await Query$1.parse(queryInput)), obj => raw ? obj : this.duckModel.schema.parse(cloneDeep__default['default'](obj)))
+    const result = [];
+
+    await this.trigger('before', 'find', { query: queryInput, raw, state, result });
+    await this.trigger('after', 'find', { query: queryInput, raw, state, result });
+
+    return raw ? result : Promise__default['default'].map(result, obj => this.duckModel.schema.parse(cloneDeep__default['default'](obj), { state }))
   }
 
   static validateEntryVersion (newEntry, oldEntry) {
@@ -1160,6 +1307,8 @@ class DuckRack extends events.EventEmitter {
     }
   }
 }
+
+const { PromiseEach } = duckfficer.Utils;
 
 class DuckStorageClass extends events.EventEmitter {
   constructor () {
@@ -1207,13 +1356,13 @@ class DuckStorageClass extends events.EventEmitter {
     });
   }
 
-  init (name, model, { methods, events } = {}) {
-    const duckRack = new DuckRack(name, {
+  async init (name, model, { methods, events } = {}) {
+    const duckRack = await new DuckRack(name, {
       duckModel: model,
       methods,
       events
     });
-    this.registerRack(duckRack);
+    await this.registerRack(duckRack);
     return duckRack
   }
 
@@ -1226,14 +1375,15 @@ class DuckStorageClass extends events.EventEmitter {
    * @param {DuckRack} duckRack
    * @return {DuckRack}
    */
-  registerRack (duckRack) {
+  async registerRack (duckRack) {
+    // todo: how about makking this function async?
     if (this.store[duckRack.name]) {
       throw new Error(`a DuckRack with the name ${duckRack.name} is already registered`)
     }
 
     this.store[duckRack.name] = duckRack;
-    this.plugins.forEach(fn => {
-      fn({ DuckStorage: this, duckRack });
+    await PromiseEach(this.plugins, fn => {
+      return fn({ DuckStorage: this, duckRack })
     });
     this._wireRack(duckRack);
     return duckRack
@@ -1454,13 +1604,13 @@ class Duck extends events.EventEmitter {
    * @param {Object} [state]
    * @return {Object} the duck proxy model
    */
-  async getModel (defaultValues = {}, state) {
+  async getModel (defaultValues = {}, state = {}) {
     const $this = this;
     let data = {};
     let consolidated = await this.schema.isValid(defaultValues);
 
     const consolidate = async ({ virtualsEnumerable = false } = {}) => {
-      data = await this.schema.parse(data, { virtualsEnumerable });
+      data = await this.schema.parse(data, { virtualsEnumerable, state });
       consolidated = true;
       return data
     };
@@ -1571,10 +1721,15 @@ class Duck extends events.EventEmitter {
  */
 async function registerDuckRacksFromObj (duckRacks) {
   return Promise__default['default'].map(Object.keys(duckRacks), async (rackName) => {
-    const { duckModel, methods } = duckRacks[rackName];
+    const { duckModel: duckModelPayload, methods = {} } = duckRacks[rackName];
+    const { schema: theSchema, methods: theMethods = {} } = duckModelPayload;
 
-    const schema = duckModel instanceof duckfficer.Schema ? duckModel : new duckfficer.Schema(duckModel.schema, { methods: duckModel.methods || {} });
-    const duckRack = await new DuckRack(rackName, { duckModel: new Duck({ schema }), methods });
+    const schema = theSchema instanceof duckfficer.Schema ? theSchema : new duckfficer.Schema(theSchema, {
+      methods: theMethods
+    });
+
+    const duckModel = duckModelPayload instanceof Duck ? duckModelPayload : new Duck({ schema });
+    const duckRack = await new DuckRack(rackName, { duckModel, methods });
     return DuckStorage.registerRack(duckRack)
   })
 }

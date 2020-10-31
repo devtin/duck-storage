@@ -67,10 +67,11 @@ test.beforeEach(async () => {
 
 test('stores schematized ducks', async t => {
   const createEvent = forEvent(Rack, 'create')
+  const state = { someProp: true }
   const entry = await Rack.create({
     firstName: 'Martin',
     lastName: 'Rafael'
-  })
+  }, state)
 
   t.truthy(entry)
   t.true(Object.prototype.hasOwnProperty.call(entry, '_id'))
@@ -80,7 +81,7 @@ test('stores schematized ducks', async t => {
   const createEventPayload = (await createEvent)[0]
 
   t.truthy(createEvent)
-  t.deepEqual(createEventPayload, entry)
+  t.deepEqual(createEventPayload, { entry, state })
 
   entry.fullName = 'Pedro Perez'
 
@@ -321,8 +322,8 @@ test('loads references of ducks in other racks', async t => {
     duckModel: CustomerModel
   })
 
-  DuckStorage.registerRack(OrderRack)
-  DuckStorage.registerRack(CustomerRack)
+  await DuckStorage.registerRack(OrderRack)
+  await DuckStorage.registerRack(CustomerRack)
 
   const customer = await CustomerRack.create({
     firstName: 'Martin',

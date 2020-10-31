@@ -11,10 +11,23 @@ import Promise from 'bluebird'
  */
 export async function registerDuckRacksFromObj (duckRacks) {
   return Promise.map(Object.keys(duckRacks), async (rackName) => {
-    const { duckModel, methods } = duckRacks[rackName]
+    const { duckModel: duckModelPayload, methods = {} } = duckRacks[rackName]
+    const { schema: theSchema, methods: theMethods = {} } = duckModelPayload
 
-    const schema = duckModel instanceof Schema ? duckModel : new Schema(duckModel.schema, { methods: duckModel.methods || {} })
-    const duckRack = await new DuckRack(rackName, { duckModel: new Duck({ schema }), methods })
+    const getSchema = () => {
+      if (theSchema instanceof Schema) {
+        return theSchema
+      }
+
+      return new Schema(theSchema, {
+        methods: theMethods
+      })
+    }
+
+    const schema = getSchema()
+
+    const duckModel = duckModelPayload instanceof Duck ? duckModelPayload : new Duck({ schema })
+    const duckRack = await new DuckRack(rackName, { duckModel, methods })
     return DuckStorage.registerRack(duckRack)
   })
 }

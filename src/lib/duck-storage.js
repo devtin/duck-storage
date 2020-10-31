@@ -3,6 +3,9 @@ import loadReference from './plugins/load-reference'
 import uniqueKeys from './plugins/unique-keys'
 import { EventEmitter } from 'events'
 import { DuckRack } from './duck-rack'
+import { Utils } from 'duckfficer'
+
+const { PromiseEach } = Utils
 
 export class DuckStorageClass extends EventEmitter {
   constructor () {
@@ -50,13 +53,13 @@ export class DuckStorageClass extends EventEmitter {
     })
   }
 
-  init (name, model, { methods, events } = {}) {
-    const duckRack = new DuckRack(name, {
+  async init (name, model, { methods, events } = {}) {
+    const duckRack = await new DuckRack(name, {
       duckModel: model,
       methods,
       events
     })
-    this.registerRack(duckRack)
+    await this.registerRack(duckRack)
     return duckRack
   }
 
@@ -69,14 +72,15 @@ export class DuckStorageClass extends EventEmitter {
    * @param {DuckRack} duckRack
    * @return {DuckRack}
    */
-  registerRack (duckRack) {
+  async registerRack (duckRack) {
+    // todo: how about makking this function async?
     if (this.store[duckRack.name]) {
       throw new Error(`a DuckRack with the name ${duckRack.name} is already registered`)
     }
 
     this.store[duckRack.name] = duckRack
-    this.plugins.forEach(fn => {
-      fn({ DuckStorage: this, duckRack })
+    await PromiseEach(this.plugins, fn => {
+      return fn({ DuckStorage: this, duckRack })
     })
     this._wireRack(duckRack)
     return duckRack

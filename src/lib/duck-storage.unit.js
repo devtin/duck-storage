@@ -12,7 +12,7 @@ test('serializes duck-rack requests when locked', async t => {
       }
     })
   })
-  DuckStorage.registerRack(user)
+  await DuckStorage.registerRack(user)
   const martin = await user.create({
     firstName: 'Martin',
     lastName: 'Gonzalez'

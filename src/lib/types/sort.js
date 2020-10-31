@@ -4,24 +4,27 @@ import { Schema, Transformers } from 'duckfficer'
 // const scalableValues = [Number, BigInt, Date]
 
 export const SortSchema = new Schema({
-  $sort: Object
+  type: Object
 })
 
 export const Sort = {
   settings: {
+    required: false,
     autoCast: true
   },
   isSort (o) {
     return Object.keys(o).filter(item => /^\$/.test(item)).length > 0
   },
-  cast (v) {
-    if (v !== undefined && !/^\$/.test(this.name) && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')) {
-      return { $eq: v }
+  cast (v, payload) {
+    if (typeof v === 'string') {
+      try {
+        return JSON.parse(v)
+      } catch (err) {}
     }
     return v
   },
   parse (v) {
-    if (!Sort.isOperator(v)) {
+    if (!Sort.isSort(v)) {
       if (Object.keys(v).length === 0) {
         return v
       }

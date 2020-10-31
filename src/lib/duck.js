@@ -93,13 +93,13 @@ export class Duck extends EventEmitter {
    * @param {Object} [state]
    * @return {Object} the duck proxy model
    */
-  async getModel (defaultValues = {}, state) {
+  async getModel (defaultValues = {}, state = {}) {
     const $this = this
     let data = {}
     let consolidated = await this.schema.isValid(defaultValues)
 
     const consolidate = async ({ virtualsEnumerable = false } = {}) => {
-      data = await this.schema.parse(data, { virtualsEnumerable })
+      data = await this.schema.parse(data, { virtualsEnumerable, state })
       consolidated = true
       return data
     }
@@ -149,10 +149,18 @@ export class Duck extends EventEmitter {
           return parentObj[finalPath]
         }
 
+        const getVirtual = () => {
+          if (parentSchema) {
+            return parentSchema.virtuals.filter(({ path }) => {
+              return path === key
+            })[0]
+          }
+
+          return false
+        }
+
         // virtuals (getters / setters)
-        const virtual = parentSchema ? parentSchema.virtuals.filter(({ path }) => {
-          return path === key
-        })[0] : false
+        const virtual = getVirtual()
 
         if (virtual) {
           return virtual.getter.call(parentPath ? Utils.find(data, parentPath) : data)

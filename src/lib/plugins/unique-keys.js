@@ -1,5 +1,6 @@
 import get from 'lodash/get'
 import { diff } from 'deep-object-diff'
+import ObjectId from 'bson-objectid'
 
 export default function ({ DuckStorage, duckRack }) {
   const keys = {}
@@ -25,7 +26,7 @@ export default function ({ DuckStorage, duckRack }) {
 
     const found = await duckRack.find({ $or })
 
-    if (found.length > 0 && found[0]._id !== entry._id) {
+    if (found.length > 0 && !ObjectId(found[0]._id).equals(entry._id)) {
       // check which keys failed
       const failingEntry = found[0]
       const failingKeys = Object.keys(keys).filter(keyId => {

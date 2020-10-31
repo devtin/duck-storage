@@ -31,6 +31,8 @@ export const QuerySchema = new Schema({
     arraySchema: 'Query'
   },
   // element query
+  $where: Object,
+  $elemMatch: Object,
   $exists: Boolean,
   $type: {
     type: Function

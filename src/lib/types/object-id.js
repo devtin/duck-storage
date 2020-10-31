@@ -8,28 +8,24 @@ Transformers.ObjectId = {
   },
   async parse (v, { state }) {
     if (ObjectId.isValid(v)) {
-      return ObjectId(v).toHexString()
+      return ObjectId(v)
     }
 
     // TODO: filter (tree shake) at build
-    if (this.settings.rack) {
-      if (!DuckStorage.getRackByName(this.settings.rack)) {
-        this.throwError(`Could not find rack '${this.settings.rack}'`)
+    if (this.settings.duckRack) {
+      if (!DuckStorage.getRackByName(this.settings.duckRack)) {
+        this.throwError(`Could not find rack '${this.settings.duckRack}'`)
       }
 
       const rawData = Object.assign({}, v)
 
       // todo: check if consolidated instead if is valid
       //       or maybe make isValid check if raw data is consolidated? :\
-      if (
-        await DuckStorage.getRackByName(this.settings.rack).duckModel.schema.isValid(rawData)
-      ) {
-        if (state.method === 'create') {
-          return ObjectId(v._id).toHexString()
-        }
-
-        return rawData
+      if (state.method === 'create' || state.method === 'update') {
+        return ObjectId(v._id)
       }
+
+      return rawData
     }
     return v
   },

@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.17
+ * duck-storage v0.0.18
  * (c) 2020 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -1253,7 +1253,7 @@ class DuckRack extends events.EventEmitter {
     return this.storeKey[_id] !== undefined
   }
 
-  async findOneById (_id, state = {}, raw) {
+  async findOneById (_id, state = {}, raw = false) {
     defaults__default['default'](state, {
       method: 'findOneById'
     });
@@ -1660,10 +1660,18 @@ class Duck extends events.EventEmitter {
           return parentObj[finalPath]
         }
 
+        const getVirtual = () => {
+          if (parentSchema) {
+            return parentSchema.virtuals.filter(({ path }) => {
+              return path === key
+            })[0]
+          }
+
+          return false
+        };
+
         // virtuals (getters / setters)
-        const virtual = parentSchema ? parentSchema.virtuals.filter(({ path }) => {
-          return path === key
-        })[0] : false;
+        const virtual = getVirtual();
 
         if (virtual) {
           return virtual.getter.call(parentPath ? duckfficer.Utils.find(data, parentPath) : data)
@@ -1724,9 +1732,17 @@ async function registerDuckRacksFromObj (duckRacks) {
     const { duckModel: duckModelPayload, methods = {} } = duckRacks[rackName];
     const { schema: theSchema, methods: theMethods = {} } = duckModelPayload;
 
-    const schema = theSchema instanceof duckfficer.Schema ? theSchema : new duckfficer.Schema(theSchema, {
-      methods: theMethods
-    });
+    const getSchema = () => {
+      if (theSchema instanceof duckfficer.Schema) {
+        return theSchema
+      }
+
+      return new duckfficer.Schema(theSchema, {
+        methods: theMethods
+      })
+    };
+
+    const schema = getSchema();
 
     const duckModel = duckModelPayload instanceof Duck ? duckModelPayload : new Duck({ schema });
     const duckRack = await new DuckRack(rackName, { duckModel, methods });

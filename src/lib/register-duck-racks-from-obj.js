@@ -16,6 +16,7 @@ export async function registerDuckRacksFromObj (duckRacks) {
 
     const getSchema = () => {
       if (theSchema instanceof Schema) {
+        // todo: if 'methods' exists, throw an error!
         return theSchema
       }
 

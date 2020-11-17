@@ -95,13 +95,13 @@ export class Duck extends EventEmitter {
    */
   async getModel (defaultValues = {}, state = {}) {
     const $this = this
-    let data = {}
+    const data = {}
     let consolidated = await this.schema.isValid(defaultValues)
 
     const consolidate = async ({ virtualsEnumerable = false } = {}) => {
-      data = await this.schema.parse(data, { virtualsEnumerable, state })
+      const dataConsolidated = await this.schema.parse(data, { virtualsEnumerable, state })
       consolidated = true
-      return data
+      return dataConsolidated
     }
 
     await Utils.PromiseEach(this.schema.paths, async path => {

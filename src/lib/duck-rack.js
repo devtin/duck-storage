@@ -3,7 +3,7 @@ import { Utils, Schema } from 'duckfficer'
 import camelCase from 'lodash/camelCase'
 import kebabCase from 'lodash/kebabCase'
 import cloneDeep from 'lodash/cloneDeep'
-import defaults from 'lodash/defaults'
+import get from 'lodash/get'
 import { detailedDiff } from 'deep-object-diff'
 import Promise from 'bluebird'
 import ObjectId from 'bson-objectid'
@@ -166,7 +166,7 @@ export class DuckRack extends EventEmitter {
    * @return {Promise<*>}
    */
   async apply ({ id, _v, path = null, method, payload, state = {}, validate }) {
-    defaults(state, {
+    Object.assign(state, {
       method: 'apply'
     })
 
@@ -243,7 +243,7 @@ export class DuckRack extends EventEmitter {
     }
 
     try {
-      entryResult = (await this.update(id, doc, state))[0]
+      entryResult = (await this.update(id, get(doc, this.duckModel.schema.ownPaths), state))[0]
       eventTrapper.dispatch(this)
     } catch (err) {
       error = err
@@ -274,7 +274,7 @@ export class DuckRack extends EventEmitter {
       throw new Error('An entry must be provided')
     }
 
-    defaults(state, {
+    Object.assign(state, {
       method: 'create'
     })
 
@@ -302,7 +302,7 @@ export class DuckRack extends EventEmitter {
    * @return {Promise<*>}
    */
   async read (_id, state = {}) {
-    defaults(state, {
+    Object.assign(state, {
       method: 'read'
     })
 
@@ -332,7 +332,7 @@ export class DuckRack extends EventEmitter {
    */
 
   async update (query, newEntry, state = {}) {
-    defaults(state, {
+    Object.assign(state, {
       method: 'update'
     })
 
@@ -341,7 +341,7 @@ export class DuckRack extends EventEmitter {
         throw new Error('_id\'s cannot be modified')
       }
 
-      if (newEntry._v && newEntry._v !== oldEntry._v) {
+      if (newEntry && newEntry._v && newEntry._v !== oldEntry._v) {
         throw new Error('Entry version mismatch')
       }
 
@@ -390,7 +390,7 @@ export class DuckRack extends EventEmitter {
    */
 
   async delete (query, state = {}) {
-    defaults(state, {
+    Object.assign(state, {
       method: 'delete'
     })
 
@@ -413,7 +413,7 @@ export class DuckRack extends EventEmitter {
 
   async deleteById (_id, state = {}) {
     this.validateId(_id)
-    defaults(state, {
+    Object.assign(state, {
       method: 'deleteById'
     })
 
@@ -425,15 +425,19 @@ export class DuckRack extends EventEmitter {
     return result[0]
   }
 
+  consolidateDoc (state) {
+    return async (doc) => {
+      const entry = await this.duckModel.getModel(doc, state)
+      return entry.consolidate({ virtualsEnumerable: true })
+    }
+  }
+
   async list (query, sort, state = {}) {
-    defaults(state, {
+    Object.assign(state, {
       method: 'list'
     })
 
-    const entries = await Promise.map(await this.find(query, state), async value => {
-      const entry = await this.duckModel.getModel(value, state)
-      return entry.consolidate()
-    })
+    const entries = await this.find(query, state)
 
     if (!sort) {
       return entries
@@ -482,7 +486,7 @@ export class DuckRack extends EventEmitter {
   }
 
   async findOneById (_id, state = {}, raw = false) {
-    defaults(state, {
+    Object.assign(state, {
       method: 'findOneById'
     })
 
@@ -501,7 +505,7 @@ export class DuckRack extends EventEmitter {
 
   // todo: add limits
   async find (queryInput = {}, state = {}, raw = false) {
-    defaults(state, {
+    Object.assign(state, {
       method: 'find'
     })
 
@@ -517,7 +521,7 @@ export class DuckRack extends EventEmitter {
     await this.trigger('before', 'find', { query: queryInput, raw, state, result })
     await this.trigger('after', 'find', { query: queryInput, raw, state, result })
 
-    return raw ? result : Promise.map(result, obj => this.duckModel.schema.parse(cloneDeep(obj), { state }))
+    return raw ? result : Promise.map(result, this.consolidateDoc(state))
   }
 
   static validateEntryVersion (newEntry, oldEntry) {

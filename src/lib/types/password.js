@@ -3,25 +3,14 @@ import bcrypt from 'bcrypt'
 
 Transformers.Password = {
   settings: {
-    emptyPasswordError: 'Please enter a valid password'
+    required: false
   },
-  loaders: [
-    {
-      type: [
-        {
-          type: String,
-          allowEmpty: false,
-          emptyError: 'Please enter a password'
-        }
-      ]
-    }
-  ],
-  validate (value) {
-    if (value === '' || value === undefined) {
-      this.throwError(this.settings.emptyPasswordError, { value })
+  loaders: [String],
+  validate (value, { state }) {
+    if (state.method === 'create' && !value) {
+      this.throwError('Please enter a valid password', { value })
     }
   },
-  // todo: add option to compare with old object
   parse (v, { state }) {
     if (
       state.method === 'create' ||

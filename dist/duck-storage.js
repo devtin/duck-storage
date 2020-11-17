@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.18
+ * duck-storage v0.0.19
  * (c) 2020 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -16,7 +16,6 @@ var deepObjectDiff = require('deep-object-diff');
 var camelCase = require('lodash/camelCase');
 var kebabCase = require('lodash/kebabCase');
 var cloneDeep = require('lodash/cloneDeep');
-var defaults = require('lodash/defaults');
 var Promise$1 = require('bluebird');
 var bcrypt = require('bcrypt');
 var jsDirIntoJson = require('js-dir-into-json');
@@ -50,7 +49,6 @@ var get__default = /*#__PURE__*/_interopDefaultLegacy(get);
 var camelCase__default = /*#__PURE__*/_interopDefaultLegacy(camelCase);
 var kebabCase__default = /*#__PURE__*/_interopDefaultLegacy(kebabCase);
 var cloneDeep__default = /*#__PURE__*/_interopDefaultLegacy(cloneDeep);
-var defaults__default = /*#__PURE__*/_interopDefaultLegacy(defaults);
 var Promise__default = /*#__PURE__*/_interopDefaultLegacy(Promise$1);
 var bcrypt__default = /*#__PURE__*/_interopDefaultLegacy(bcrypt);
 
@@ -512,25 +510,14 @@ duckfficer.Transformers.Sort = Sort;
 
 duckfficer.Transformers.Password = {
   settings: {
-    emptyPasswordError: 'Please enter a valid password'
+    required: false
   },
-  loaders: [
-    {
-      type: [
-        {
-          type: String,
-          allowEmpty: false,
-          emptyError: 'Please enter a password'
-        }
-      ]
-    }
-  ],
-  validate (value) {
-    if (value === '' || value === undefined) {
-      this.throwError(this.settings.emptyPasswordError, { value });
+  loaders: [String],
+  validate (value, { state }) {
+    if (state.method === 'create' && !value) {
+      this.throwError('Please enter a valid password', { value });
     }
   },
-  // todo: add option to compare with old object
   parse (v, { state }) {
     if (
       state.method === 'create' ||
@@ -938,7 +925,7 @@ class DuckRack extends events.EventEmitter {
    * @return {Promise<*>}
    */
   async apply ({ id, _v, path = null, method, payload, state = {}, validate }) {
-    defaults__default['default'](state, {
+    Object.assign(state, {
       method: 'apply'
     });
 
@@ -1015,7 +1002,7 @@ class DuckRack extends events.EventEmitter {
     }
 
     try {
-      entryResult = (await this.update(id, doc, state))[0];
+      entryResult = (await this.update(id, get__default['default'](doc, this.duckModel.schema.ownPaths), state))[0];
       eventTrapper.dispatch(this);
     } catch (err) {
       error = err;
@@ -1046,7 +1033,7 @@ class DuckRack extends events.EventEmitter {
       throw new Error('An entry must be provided')
     }
 
-    defaults__default['default'](state, {
+    Object.assign(state, {
       method: 'create'
     });
 
@@ -1074,7 +1061,7 @@ class DuckRack extends events.EventEmitter {
    * @return {Promise<*>}
    */
   async read (_id, state = {}) {
-    defaults__default['default'](state, {
+    Object.assign(state, {
       method: 'read'
     });
 
@@ -1104,7 +1091,7 @@ class DuckRack extends events.EventEmitter {
    */
 
   async update (query, newEntry, state = {}) {
-    defaults__default['default'](state, {
+    Object.assign(state, {
       method: 'update'
     });
 
@@ -1113,7 +1100,7 @@ class DuckRack extends events.EventEmitter {
         throw new Error('_id\'s cannot be modified')
       }
 
-      if (newEntry._v && newEntry._v !== oldEntry._v) {
+      if (newEntry && newEntry._v && newEntry._v !== oldEntry._v) {
         throw new Error('Entry version mismatch')
       }
 
@@ -1162,7 +1149,7 @@ class DuckRack extends events.EventEmitter {
    */
 
   async delete (query, state = {}) {
-    defaults__default['default'](state, {
+    Object.assign(state, {
       method: 'delete'
     });
 
@@ -1185,7 +1172,7 @@ class DuckRack extends events.EventEmitter {
 
   async deleteById (_id, state = {}) {
     this.validateId(_id);
-    defaults__default['default'](state, {
+    Object.assign(state, {
       method: 'deleteById'
     });
 
@@ -1197,15 +1184,19 @@ class DuckRack extends events.EventEmitter {
     return result[0]
   }
 
+  consolidateDoc (state) {
+    return async (doc) => {
+      const entry = await this.duckModel.getModel(doc, state);
+      return entry.consolidate({ virtualsEnumerable: true })
+    }
+  }
+
   async list (query, sort, state = {}) {
-    defaults__default['default'](state, {
+    Object.assign(state, {
       method: 'list'
     });
 
-    const entries = await Promise__default['default'].map(await this.find(query, state), async value => {
-      const entry = await this.duckModel.getModel(value, state);
-      return entry.consolidate()
-    });
+    const entries = await this.find(query, state);
 
     if (!sort) {
       return entries
@@ -1254,7 +1245,7 @@ class DuckRack extends events.EventEmitter {
   }
 
   async findOneById (_id, state = {}, raw = false) {
-    defaults__default['default'](state, {
+    Object.assign(state, {
       method: 'findOneById'
     });
 
@@ -1273,7 +1264,7 @@ class DuckRack extends events.EventEmitter {
 
   // todo: add limits
   async find (queryInput = {}, state = {}, raw = false) {
-    defaults__default['default'](state, {
+    Object.assign(state, {
       method: 'find'
     });
 
@@ -1289,7 +1280,7 @@ class DuckRack extends events.EventEmitter {
     await this.trigger('before', 'find', { query: queryInput, raw, state, result });
     await this.trigger('after', 'find', { query: queryInput, raw, state, result });
 
-    return raw ? result : Promise__default['default'].map(result, obj => this.duckModel.schema.parse(cloneDeep__default['default'](obj), { state }))
+    return raw ? result : Promise__default['default'].map(result, this.consolidateDoc(state))
   }
 
   static validateEntryVersion (newEntry, oldEntry) {
@@ -1606,13 +1597,13 @@ class Duck extends events.EventEmitter {
    */
   async getModel (defaultValues = {}, state = {}) {
     const $this = this;
-    let data = {};
+    const data = {};
     let consolidated = await this.schema.isValid(defaultValues);
 
     const consolidate = async ({ virtualsEnumerable = false } = {}) => {
-      data = await this.schema.parse(data, { virtualsEnumerable, state });
+      const dataConsolidated = await this.schema.parse(data, { virtualsEnumerable, state });
       consolidated = true;
-      return data
+      return dataConsolidated
     };
 
     await duckfficer.Utils.PromiseEach(this.schema.paths, async path => {
@@ -1734,6 +1725,7 @@ async function registerDuckRacksFromObj (duckRacks) {
 
     const getSchema = () => {
       if (theSchema instanceof duckfficer.Schema) {
+        // todo: if 'methods' exists, throw an error!
         return theSchema
       }
 

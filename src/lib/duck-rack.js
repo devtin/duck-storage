@@ -3,7 +3,7 @@ import { Utils, Schema } from 'duckfficer'
 import camelCase from 'lodash/camelCase'
 import kebabCase from 'lodash/kebabCase'
 import cloneDeep from 'lodash/cloneDeep'
-import get from 'lodash/get'
+import pick from 'lodash/pick'
 import { detailedDiff } from 'deep-object-diff'
 import Promise from 'bluebird'
 import ObjectId from 'bson-objectid'
@@ -243,7 +243,8 @@ export class DuckRack extends EventEmitter {
     }
 
     try {
-      entryResult = (await this.update(id, get(doc, this.duckModel.schema.ownPaths), state))[0]
+      const updating = pick(doc, this.duckModel.schema.ownPaths)
+      entryResult = (await this.update(id, updating, state))[0]
       eventTrapper.dispatch(this)
     } catch (err) {
       error = err

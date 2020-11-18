@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.19
+ * duck-storage v0.0.20
  * (c) 2020 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -16,6 +16,7 @@ var deepObjectDiff = require('deep-object-diff');
 var camelCase = require('lodash/camelCase');
 var kebabCase = require('lodash/kebabCase');
 var cloneDeep = require('lodash/cloneDeep');
+var pick = require('lodash/pick');
 var Promise$1 = require('bluebird');
 var bcrypt = require('bcrypt');
 var jsDirIntoJson = require('js-dir-into-json');
@@ -49,6 +50,7 @@ var get__default = /*#__PURE__*/_interopDefaultLegacy(get);
 var camelCase__default = /*#__PURE__*/_interopDefaultLegacy(camelCase);
 var kebabCase__default = /*#__PURE__*/_interopDefaultLegacy(kebabCase);
 var cloneDeep__default = /*#__PURE__*/_interopDefaultLegacy(cloneDeep);
+var pick__default = /*#__PURE__*/_interopDefaultLegacy(pick);
 var Promise__default = /*#__PURE__*/_interopDefaultLegacy(Promise$1);
 var bcrypt__default = /*#__PURE__*/_interopDefaultLegacy(bcrypt);
 
@@ -1002,7 +1004,8 @@ class DuckRack extends events.EventEmitter {
     }
 
     try {
-      entryResult = (await this.update(id, get__default['default'](doc, this.duckModel.schema.ownPaths), state))[0];
+      const updating = pick__default['default'](doc, this.duckModel.schema.ownPaths);
+      entryResult = (await this.update(id, updating, state))[0];
       eventTrapper.dispatch(this);
     } catch (err) {
       error = err;

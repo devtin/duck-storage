@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.20](https://github.com/devtin/duck-storage/compare/v0.0.19...v0.0.20) (2020-11-18)
+
+
+### Bug Fixes
+
+* pick props ([dec0072](https://github.com/devtin/duck-storage/commit/dec00723a97f34e58d1bc5d11bfad8fc6e68cca1))
+
 ### [0.0.19](https://github.com/devtin/duck-storage/compare/v0.0.18...v0.0.19) (2020-11-17)
 
 ### [0.0.18](https://github.com/devtin/duck-storage/compare/v0.0.17...v0.0.18) (2020-10-31)

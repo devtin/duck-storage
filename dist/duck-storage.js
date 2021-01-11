@@ -1,6 +1,6 @@
 /*!
- * duck-storage v0.0.20
- * (c) 2020 Martin Rafael Gonzalez <tin@devtin.io>
+ * duck-storage v0.0.21
+ * (c) 2020-2021 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
 'use strict';
@@ -1747,7 +1747,7 @@ async function registerDuckRacksFromObj (duckRacks) {
 
 async function registerDuckRacksFromDir (directory) {
   return registerDuckRacksFromObj(await jsDirIntoJson.jsDirIntoJson(directory, {
-    extensions: ['!lib', '!__tests__', '!*.unit.js', '!*.test.js', '*.js', '*.mjs']
+    extensions: ['!lib', '!__tests__', '!*.unit.js', '!*.spec.js', '!*.test.js', '*.js', '*.mjs']
   }))
 }
 

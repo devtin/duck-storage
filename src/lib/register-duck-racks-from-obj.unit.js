@@ -1,8 +1,13 @@
 import test from 'ava'
 import { registerDuckRacksFromObj } from './register-duck-racks-from-obj'
+import { DuckStorageClass } from './duck-storage.js'
+import inMemory from './plugins/in-memory-db.js'
 
 test('register multiple ducks from an object mapping duck-models', async t => {
-  const duckRacks = await registerDuckRacksFromObj({
+  const duckRacks = await registerDuckRacksFromObj(await new DuckStorageClass({
+    setupIpc: false,
+    plugins: [inMemory]
+  }), {
     user: {
       duckModel: {
         schema: {
@@ -28,8 +33,9 @@ test('register multiple ducks from an object mapping duck-models', async t => {
   const userModel = await duckRacks[0].duckModel.getModel()
   userModel.fullName = 'Martin'
   userModel.password = '123'
-  await t.notThrowsAsync(() => userModel.consolidate())
-  userModel.log('yup')
-  t.deepEqual(userModel.logs, ['yup'])
+  const consolidatedModel = await userModel.consolidate()
+
+  consolidatedModel.log('yup')
+  t.deepEqual(consolidatedModel.logs, ['yup'])
   t.snapshot(duckRacks)
 })

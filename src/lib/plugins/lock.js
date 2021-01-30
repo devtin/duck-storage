@@ -54,6 +54,7 @@ export default function ({ lockTimeout = 3000 } = {}) {
         }
       })
     })
+
     duckRack.hook('before', 'create', async ({ entry, state }, rollback) => {
       const { _id } = entry
       if (doLock(state)) {
@@ -61,6 +62,7 @@ export default function ({ lockTimeout = 3000 } = {}) {
       }
       rollback.push(duckRack.unlock.bind(duckRack, _id))
     })
+
     duckRack.hook('before', 'update', async ({ oldEntry, newEntry, entry, state }, rollback) => {
       const { _id } = oldEntry
       if (doLock(state)) {
@@ -68,9 +70,11 @@ export default function ({ lockTimeout = 3000 } = {}) {
       }
       rollback.push(duckRack.unlock.bind(duckRack, _id))
     })
+
     duckRack.hook('after', 'update', async ({ oldEntry, newEntry, entry }) => {
       duckRack.unlock(oldEntry._id)
     })
+
     duckRack.hook('before', 'delete', async ({ entry, state }, rollback) => {
       const { _id } = entry
       if (doLock(state)) {
@@ -78,6 +82,7 @@ export default function ({ lockTimeout = 3000 } = {}) {
       }
       rollback.push(duckRack.unlock.bind(duckRack, _id))
     })
+
     duckRack.hook('after', 'delete', async ({ entry }) => {
       const { _id } = entry
       duckRack.unlock(_id)

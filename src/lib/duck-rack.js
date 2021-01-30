@@ -3,6 +3,7 @@ import { Utils, Schema } from 'duckfficer'
 import camelCase from 'lodash/camelCase'
 import kebabCase from 'lodash/kebabCase'
 import cloneDeep from 'lodash/cloneDeep'
+import unset from 'lodash/unset'
 import pick from 'lodash/pick'
 import { detailedDiff } from 'deep-object-diff'
 import Promise from 'bluebird'
@@ -44,6 +45,7 @@ const objectHasBeenModified = (objA, objB) => {
   return modified
 }
 
+// todo: move these errors to a folder
 class DuckRackError extends Error {
   constructor (message, error) {
     super(message)
@@ -170,23 +172,19 @@ export class DuckRack extends EventEmitter {
       method: 'apply'
     })
 
-    const getQuery = () => {
-      if (_v) {
-        return {
-          _id: ObjectId(id),
-          _v: {
-            $eq: _v
-          }
-        }
-      }
-      return id
-    }
-
     await this.trigger('before', 'apply', { id, _v, method, path, payload, state })
 
-    const query = getQuery()
+    const getDoc = async () => {
+      const doc = await this.findOneById(id, {})
 
-    const doc = (await this.find(query))[0]
+      if (!doc) {
+        throw new Error('document not found')
+      }
+
+      return this.duckModel.schema.parse(doc)
+    }
+
+    const doc = await getDoc()
 
     if (!doc) {
       throw new Error('document not found')
@@ -281,7 +279,7 @@ export class DuckRack extends EventEmitter {
 
     DuckRack.validateEntryVersion(newEntry)
 
-    const entry = await this.schema.parse(newEntry, { state, virtualsEnumerable: false })
+    const entry = await this.schema.parse(newEntry)
 
     Object.assign(state, {
       entryProcessed: false
@@ -289,7 +287,7 @@ export class DuckRack extends EventEmitter {
 
     await this.trigger('before', 'create', { entry, state })
     const entryModel = await this.duckModel.getModel(entry, state)
-    const createdEntry = await entryModel.consolidate()
+    const createdEntry = await entryModel.consolidate({ virtualsEnumerable: true })
     await this.trigger('after', 'create', { entry: createdEntry, state })
     this.emit('create', { entry: createdEntry, state })
 
@@ -311,12 +309,20 @@ export class DuckRack extends EventEmitter {
     if (entry) {
       await this.trigger('before', 'read', { entry, state })
       const recoveredEntry = await this.duckModel.schema.parse(cloneDeep(entry), {
-        state
+        state,
+        virtualsEnumerable: true
       })
       await this.trigger('after', 'read', { entry: recoveredEntry, state })
 
       return recoveredEntry
     }
+  }
+
+  withoutVirtuals (obj) {
+    this.schema.virtuals.forEach(({ path }) => {
+      unset(obj, path)
+    })
+    return obj
   }
 
   /**
@@ -337,7 +343,7 @@ export class DuckRack extends EventEmitter {
       method: 'update'
     })
 
-    const entries = (await this.find(query, state, true)).map(oldEntry => {
+    const entries = (await this.list(query, { state, raw: true, virtuals: false })).map(oldEntry => {
       if (newEntry && newEntry._id && !ObjectId(oldEntry._id).equals(newEntry._id)) {
         throw new Error('_id\'s cannot be modified')
       }
@@ -355,7 +361,7 @@ export class DuckRack extends EventEmitter {
       Object.assign(state, { oldEntry })
       const composedNewEntry = Object.assign(cloneDeep(oldEntry), newEntry)
 
-      const entry = await this.schema.parse(composedNewEntry, { state })
+      const entry = await this.schema.parse(this.withoutVirtuals(composedNewEntry), { state })
 
       if (!objectHasBeenModified(oldEntry, entry)) {
         newEntries.push(oldEntry)
@@ -366,15 +372,15 @@ export class DuckRack extends EventEmitter {
       const result = []
 
       await this.trigger('before', 'update', { oldEntry, newEntry, entry, state, result })
-      this.emit('update', { oldEntry, newEntry, entry })
       await this.trigger('after', 'update', { oldEntry, newEntry, entry, state, result })
+      this.emit('update', { oldEntry, newEntry, entry, result })
 
       if (result.length > 0) {
         newEntries.push(...result)
       }
     }
 
-    return Promise.map(newEntries, entry => this.schema.parse(entry))
+    return Promise.map(newEntries, entry => this.schema.parse(entry, { virtualsEnumerable: true }))
   }
 
   /**
@@ -397,7 +403,7 @@ export class DuckRack extends EventEmitter {
 
     await this.trigger('before', 'deleteMultiple', { query, state })
 
-    const entriesToRemove = await this.find(query)
+    const entriesToRemove = await this.list(query, { virtuals: false })
     const removedEntries = []
 
     for (const entry of entriesToRemove) {
@@ -426,54 +432,11 @@ export class DuckRack extends EventEmitter {
     return result[0]
   }
 
-  consolidateDoc (state) {
+  consolidateDoc (state, { virtuals } = {}) {
     return async (doc) => {
       const entry = await this.duckModel.getModel(doc, state)
-      return entry.consolidate({ virtualsEnumerable: true })
+      return entry.consolidate({ virtualsEnumerable: virtuals })
     }
-  }
-
-  async list (query, sort, state = {}) {
-    Object.assign(state, {
-      method: 'list'
-    })
-
-    const entries = await this.find(query, state)
-
-    if (!sort) {
-      return entries
-    }
-
-    const sortArray = (arr, sort) => {
-      const toIndex = (value) => {
-        if (typeof value === 'boolean') {
-          return value ? 1 : -1
-        }
-        return value
-      }
-      const calcIndex = (a, b, factor = 1) => {
-        if (a === b) {
-          return 0
-        }
-
-        if (typeof a === 'string' && typeof b === 'string') {
-          return toIndex(a > b) * factor
-        }
-        const A = toIndex(a)
-        const B = toIndex(b)
-
-        return (A - B) * factor
-      }
-
-      Utils.obj2dot(sort).reverse().forEach(prop => {
-        arr = arr.sort((a, b) => {
-          return calcIndex(Utils.find(a, prop), Utils.find(b, prop), toIndex(Utils.find(sort, prop)))
-        })
-      })
-      return arr
-    }
-
-    return sortArray(entries, sort)
   }
 
   validateId () {
@@ -486,31 +449,28 @@ export class DuckRack extends EventEmitter {
     return this.storeKey[_id] !== undefined
   }
 
-  async findOneById (_id, state = {}, raw = false) {
+  async findOneById (_id, { _v, state = {}, raw = false } = {}) {
     Object.assign(state, {
       method: 'findOneById'
     })
 
-    const queryInput = {
-      _id: ObjectId(_id)
-    }
-
     const result = []
 
     // todo: remove before / after states as they may not be needed any more
-    await this.trigger('before', 'findOneById', { _id, queryInput, state, result })
+    await this.trigger('before', 'findOneById', { _id, _v, state, result })
 
-    await this.trigger('after', 'findOneById', { _id, queryInput, result, state })
+    await this.trigger('after', 'findOneById', { _id, _v, result, state })
     return result[0]
   }
 
-  // todo: add limits
-  async find (queryInput = {}, state = {}, raw = false) {
+  // todo: add limits, sort
+  // todo: rename to read?
+  async list (queryInput = {}, { sort, skip, limit, state = {}, raw = false, virtuals = true } = {}) {
     Object.assign(state, {
       method: 'find'
     })
 
-    // todo: run hooks
+    // todo: move this to mongodb plugin
     if (ObjectId.isValid(queryInput)) {
       queryInput = {
         _id: ObjectId(queryInput)
@@ -519,10 +479,10 @@ export class DuckRack extends EventEmitter {
 
     const result = []
 
-    await this.trigger('before', 'find', { query: queryInput, raw, state, result })
-    await this.trigger('after', 'find', { query: queryInput, raw, state, result })
+    await this.trigger('before', 'list', { query: queryInput, sort, skip, limit, raw, state, result })
+    await this.trigger('after', 'list', { query: queryInput, sort, skip, limit, raw, state, result })
 
-    return raw ? result : Promise.map(result, this.consolidateDoc(state))
+    return raw ? result : Promise.map(result, this.consolidateDoc(state, { virtuals }))
   }
 
   static validateEntryVersion (newEntry, oldEntry) {

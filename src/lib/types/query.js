@@ -1,4 +1,5 @@
 import { Schema, Transformers } from 'duckfficer'
+import ObjectId from 'bson-objectid'
 
 const primitiveValues = [Number, BigInt, String, Object, Array, Boolean, Date]
 const scalableValues = [Number, BigInt, Date]
@@ -54,7 +55,7 @@ export const Query = {
   },
   async parse (v) {
     if (!Query.isOperator(v)) {
-      if (Object.keys(v).length === 0) {
+      if (Object.keys(v).length === 0 || ObjectId.isValid(v)) {
         return v
       }
 

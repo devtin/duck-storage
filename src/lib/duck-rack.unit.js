@@ -1,9 +1,24 @@
-import { Duck } from './duck'
-import { DuckRack } from './duck-rack'
 import { Schema } from 'duckfficer'
 import test from 'ava'
-import { DuckStorage } from './duck-storage'
 import Promise from 'bluebird'
+import { Duck } from './duck'
+import { DuckRack } from './duck-rack'
+import { DuckStorageClass } from './duck-storage'
+import inMemory from './plugins/in-memory-db'
+
+const getStoragePlugin = () => {
+  const plugin = require(process.env.STORAGE_PLUGIN || './plugins/in-memory-db.js')
+
+  if (plugin.default) {
+    return plugin.default
+  }
+
+  return plugin
+}
+
+const storagePlugin = getStoragePlugin()
+
+const storage = storagePlugin()
 
 const forEvent = (instance, eventName, { timeout = 2000, trap = 1 } = {}) => {
   const trapped = []
@@ -59,11 +74,16 @@ test.before(async () => {
   Rack = await new DuckRack('some-rack-name', {
     duckModel: ContactModel
   })
+  storage({ duckRack: Rack })
 })
 
 test.beforeEach(async () => {
   return Rack.delete({})
 })
+
+const withVirtuals = (entry) => {
+  return Rack.schema.parse(entry, { virtualsEnumerable: true })
+}
 
 test('stores schematized ducks', async t => {
   const createEvent = forEvent(Rack, 'create')
@@ -115,9 +135,9 @@ test('updates information of a duck', async t => {
   const updatePayload = (await updateEvent)[0]
 
   t.truthy(updatePayload)
-  t.deepEqual(updatePayload.oldEntry, created)
+  t.deepEqual(await withVirtuals(updatePayload.oldEntry), created)
   t.deepEqual(updatePayload.newEntry, toUpdate)
-  t.deepEqual(updatePayload.entry, updated[0])
+  t.deepEqual(await withVirtuals(updatePayload.entry), updated[0])
 
   t.true(Array.isArray(updated))
   t.is(updated.length, 1)
@@ -166,13 +186,13 @@ test('updates information of multiple ducks at a time', async t => {
 
   t.truthy(updatePayload)
 
-  t.deepEqual(updatePayload[0].oldEntry, martin)
+  t.deepEqual(await withVirtuals(updatePayload[0].oldEntry), martin)
   t.deepEqual(updatePayload[0].newEntry, toUpdate)
-  t.deepEqual(updatePayload[0].entry, updated[0])
+  t.deepEqual(await withVirtuals(updatePayload[0].entry), updated[0])
 
-  t.deepEqual(updatePayload[1].oldEntry, ana)
+  t.deepEqual(await withVirtuals(updatePayload[1].oldEntry), ana)
   t.deepEqual(updatePayload[1].newEntry, toUpdate)
-  t.deepEqual(updatePayload[1].entry, updated[1])
+  t.deepEqual(await withVirtuals(updatePayload[1].entry), updated[1])
 })
 
 test('removes ducks from the rack', async t => {
@@ -181,11 +201,11 @@ test('removes ducks from the rack', async t => {
     firstName: 'Martin',
     lastName: 'Gonzalez'
   })
+
   const deleted = await Rack.delete({
-    _id: {
-      $eq: entry._id
-    }
+    _id: entry._id
   })
+
   const deletedPayload = (await deleteEvent)[0]
 
   t.deepEqual(deletedPayload, deleted[0])
@@ -260,37 +280,50 @@ test('sorts ducks in a rack by custom properties', async t => {
   })
 
   const res = await Rack.list({}, {
-    firstName: -1
+    sort: {
+      firstName: -1
+    }
   })
 
   t.deepEqual(res, [ruth, olivia, martin, ana])
 
   const res2 = await Rack.list({}, {
-    lastName: -1,
-    firstName: 1
+    sort: {
+      lastName: -1,
+      firstName: 1
+    }
   })
 
   t.deepEqual(res2, [ana, ruth, martin, olivia])
 
   const res3 = await Rack.list({}, {
-    address: {
-      zip: -1
+    sort: {
+      address: {
+        zip: -1
+      }
     }
   })
 
   t.deepEqual(res3, [ruth, ana, olivia, martin])
 
   const res4 = await Rack.list({}, {
-    address: {
-      line2: 1
-    },
-    firstName: 1
+    sort: {
+      address: {
+        line2: 1
+      },
+      firstName: 1
+    }
   })
 
   t.deepEqual(res4, [ruth, ana, martin, olivia])
 })
 
-test('loads references of ducks in other racks', async t => {
+test.only('loads references of ducks in other racks', async t => {
+  const DuckStorage = await new DuckStorageClass({
+    plugins: [inMemory()],
+    setupIpc: false
+  })
+
   const orderSchema = new Schema({
     customer: {
       type: 'ObjectId',
@@ -395,6 +428,8 @@ test('defines duck rack methods', async t => {
     }
   })
 
+  storage({ duckRack: UserRack })
+
   await UserRack.create({
     name: 'Martin',
     level: 'admin'
@@ -459,6 +494,8 @@ test('apply calls a method in the model and mutates the state if everything goes
 
   const UserDuck = new Duck({ schema: User })
   const UserRack = await new DuckRack('user', { duckModel: UserDuck })
+
+  storage({ duckRack: UserRack })
 
   const martin = await UserRack.create({
     firstName: 'Martin',

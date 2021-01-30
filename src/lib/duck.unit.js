@@ -68,12 +68,12 @@ test('validates properties at consolidation', async t => {
   err = t.throws(() => duckModel.getEmailDomain())
   t.is(err.message, 'consolidate the model prior invoking method getEmailDomain')
 
-  await duckModel.consolidate()
+  const consolidatedDuck = await duckModel.consolidate()
 
   t.truthy(duckModel._id)
-  t.is(await duckModel.getEmailDomain(), 'devtin.io')
+  t.is(await consolidatedDuck.getEmailDomain(), 'devtin.io')
 
-  t.deepEqual(await duckModel.toObject(), {
+  t.deepEqual(cleanId(await duckModel.toObject()), {
     _id: duckModel._id,
     _v: 1,
     firstName: 'Martin',

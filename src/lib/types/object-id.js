@@ -1,41 +1,24 @@
 import { Transformers } from 'duckfficer'
 import ObjectId from 'bson-objectid'
-import { DuckStorage } from '../duck-storage'
 
 Transformers.ObjectId = {
   settings: {
+    autoCast: true,
     unique: true
   },
-  async parse (v, { state }) {
-    if (ObjectId.isValid(v)) {
-      return ObjectId(v)
-    }
-
-    // TODO: filter (tree shake) at build
-    if (this.settings.duckRack) {
-      if (!DuckStorage.getRackByName(this.settings.duckRack)) {
-        this.throwError(`Could not find rack '${this.settings.duckRack}'`)
-      }
-
-      const rawData = Object.assign({}, v)
-
-      // todo: check if consolidated instead if is valid
-      //       or maybe make isValid check if raw data is consolidated? :\
-      if (state.method === 'create' || state.method === 'update') {
-        return ObjectId(v._id)
-      }
-
-      return rawData
+  cast (v) {
+    if (!ObjectId.isValid(v) && typeof v === 'object' && ObjectId.isValid(v._id)) {
+      return v._id
     }
     return v
   },
-  async validate (v) {
-    if (
-      this.settings.duckRack &&
-        await DuckStorage.getRackByName(this.settings.duckRack).duckModel.schema.isValid(v)
-    ) {
-      return
+  async parse (v, { state }) {
+    if (ObjectId.isValid(v)) {
+      return ObjectId(v).toString()
     }
+    return v
+  },
+  validate (v) {
     if (!ObjectId.isValid(v)) {
       this.throwError('Invalid ObjectId')
     }

@@ -1,8 +1,5 @@
 import { Schema, Transformers } from 'duckfficer'
 
-// const primitiveValues = [Number, BigInt, String, Object, Array, Boolean, Date]
-// const scalableValues = [Number, BigInt, Date]
-
 export const SortSchema = new Schema({
   type: Object
 })
@@ -29,7 +26,7 @@ export const Sort = {
         return v
       }
 
-      return new Schema({ type: Object, mapSchema: 'Query' }, {
+      return new Schema({ type: Object, mapSchema: 'Sort' }, {
         name: this.name,
         parent: this instanceof Schema ? this : undefined
       }).parse(v)
@@ -45,7 +42,6 @@ export const Sort = {
       throw new Error(err)
     }
 
-    // console.log(`looking for schema at`, this.fullPath, operator, QuerySchema.schemaAtPath(operator))
     return {
       [operator]: Schema.cloneSchema({
         schema: SortSchema.schemaAtPath(operator),

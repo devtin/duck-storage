@@ -1,9 +1,17 @@
 import test from 'ava'
-import { DuckStorage } from './duck-storage'
+import inMemory from './plugins/in-memory-db.js'
+import { DuckStorageClass } from './duck-storage'
 import { DuckRack } from './duck-rack'
 import { Duck } from './duck'
+import faker from 'faker'
 
-test('serializes duck-rack requests when locked', async t => {
+let DuckStorage
+
+test.before(async () => {
+  DuckStorage = await new DuckStorageClass({
+    plugins: [inMemory()]
+  })
+
   const user = await new DuckRack('user', {
     duckModel: new Duck({
       schema: {
@@ -13,6 +21,10 @@ test('serializes duck-rack requests when locked', async t => {
     })
   })
   await DuckStorage.registerRack(user)
+})
+
+test('serializes duck-rack requests when locked', async t => {
+  const user = DuckStorage.getRackByName('user')
   const martin = await user.create({
     firstName: 'Martin',
     lastName: 'Gonzalez'
@@ -30,4 +42,22 @@ test('serializes duck-rack requests when locked', async t => {
 
   await Promise.all(update)
   t.is((await user.read(martin._id)).lastName, 'Rafael')
+})
+
+test.only('speed', async (t) => {
+  const entries = (new Array(1000)).fill(undefined).map(() => {
+    return {
+      firstName: faker.name.firstName(),
+      lastName: faker.name.lastName()
+    }
+  })
+
+  const start = Date.now()
+  const userRack = DuckStorage.getRackByName('user')
+
+  await Promise.all(entries.map((entry) => {
+    return userRack.create(entry)
+  }))
+  t.log('finished in', Date.now() - start)
+  t.true((await userRack.list()).length >= 1000)
 })

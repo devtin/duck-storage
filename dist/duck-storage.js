@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.22
+ * duck-storage v0.0.23
  * (c) 2020-2021 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -11,8 +11,8 @@ var cloneDeep = require('lodash/cloneDeep');
 var duckfficer = require('duckfficer');
 var sift = require('sift');
 var ipc = require('node-ipc');
-var events = require('events');
 var pkgUp = require('pkg-up');
+var events = require('events');
 var R = require('ramda');
 var set = require('lodash/set');
 var camelCase = require('lodash/camelCase');
@@ -152,11 +152,210 @@ function InMemory ({ storeKey = {} } = {}) {
   }
 }
 
+function parsePath(text) {
+  return text.split('.')
+}
+
+function push(arr, el) {
+  const newArr = arr.slice();
+  newArr.push(el);
+  return newArr;
+}
+
+// names of the traps that can be registered with ES6's Proxy object
+const trapNames = [
+  'apply',
+  'construct',
+  'defineProperty',
+  'deleteProperty',
+  'enumerate',
+  'get',
+  'getOwnPropertyDescriptor',
+  'getPrototypeOf',
+  'has',
+  'isExtensible',
+  'ownKeys',
+  'preventExtensions',
+  'set',
+  'setPrototypeOf',
+];
+
+// a list of paramer indexes that indicate that the a recieves a key at that parameter
+// this information will be used to update the path accordingly
+const keys = {
+  get: 1,
+  set: 1,
+  deleteProperty: 1,
+  has: 1,
+  defineProperty: 1,
+  getOwnPropertyDescriptor: 1,
+};
+
+function DeepProxy(rootTarget, traps, options) {
+
+  let path = [];
+  let userData = {};
+
+  if (options !== undefined && typeof options.path !== 'undefined') {
+    path = parsePath(options.path);
+  }
+  if (options !== undefined && typeof options.userData !== 'undefined') {
+    userData = options.userData;
+  }
+
+  function createProxy(target, path) {
+
+    // avoid creating a new object between two traps
+    const context = { rootTarget, path };
+    Object.assign(context, userData);
+
+    const realTraps = {};
+
+    for (const trapName of trapNames) {
+      const keyParamIdx = keys[trapName]
+          , trap = traps[trapName];
+
+      if (typeof trap !== 'undefined') {
+
+        if (typeof keyParamIdx !== 'undefined') {
+
+          realTraps[trapName] = function () {
+
+            const key = arguments[keyParamIdx];
+
+            // update context for this trap
+            context.nest = function (nestedTarget) {
+              if (nestedTarget === undefined)
+                nestedTarget = rootTarget;
+              return createProxy(nestedTarget, push(path, key)); 
+            };
+
+            return trap.apply(context, arguments);
+          };
+        } else {
+
+          realTraps[trapName] = function () {
+
+            // update context for this trap
+            context.nest = function (nestedTarget) {
+              if (nestedTarget === undefined)
+                nestedTarget = {};
+              return createProxy(nestedTarget, path);
+            };
+
+            return trap.apply(context, arguments);
+          };
+        }
+      }
+    }
+
+    return new Proxy(target, realTraps);
+  }
+
+  return createProxy(rootTarget, path);
+
+}
+
+var proxyDeep = DeepProxy;
+
 const getAppName = async () => {
   const nearestPackageJson = await pkgUp__default['default']();
   const packageName = nearestPackageJson ? require(nearestPackageJson).name : 'unknown';
   return `duckstorage_${packageName}.`
 };
+
+const UUIDPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+
+function uuid () {
+  // GUID / UUID RFC4122 version 4 taken from: https://stackoverflow.com/a/2117523/1064165
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+
+    return v.toString(16)
+  })
+}
+
+duckfficer.Transformers.uuid = {
+  settings: {
+    loaders: [{
+      type: String,
+      regex: [UUIDPattern, '{ value } is not a valid UUID']
+    }],
+    required: false,
+    default: uuid
+  }
+};
+
+const ipcConnect = async ({ appSpace, clientId }) => {
+  Object.assign(ipc__default['default'].config, {
+    appspace: appSpace || await getAppName(),
+    id: clientId,
+    silent: true
+  });
+
+  return new Promise((resolve, reject) => {
+    ipc__default['default'].connectTo('main', () => {
+      resolve(ipc__default['default'].of.main);
+    });
+  })
+};
+
+const ipcDisconnect = async () => {
+  return new Promise((resolve, reject) => {
+    ipc__default['default'].of.main.on('disconnect', resolve);
+    setTimeout(() => reject(new Error('ipc disconnec time-dout')), 3000);
+    ipc__default['default'].disconnect('main');
+  })
+};
+
+class DuckStorageClient {
+  constructor ({
+    appSpace,
+    clientId
+  } = {}) {
+    return (async () => {
+      this.ipc = await ipcConnect({ appSpace, clientId });
+      return this.proxy()
+    })()
+  }
+
+  process ({ args, path }) {
+    return new Promise((resolve, reject) => {
+      const id = uuid();
+      this.ipc.on(id, ({ error, result }) => {
+        if (error) {
+          return reject(error)
+        }
+
+        resolve(result);
+      });
+      this.ipc.emit('storage', {
+        id,
+        path,
+        args
+      });
+    })
+  }
+
+  proxy () {
+    const $this = this;
+    return new proxyDeep({}, {
+      get (target, path, receiver) {
+        if (path === 'then') {
+          return
+        }
+        if (path === 'disconnect') {
+          return ipcDisconnect
+        }
+        return this.nest(function () {})
+      },
+      apply (target, thisArg, args) {
+        return $this.process({ args, path: this.path })
+      }
+    })
+  }
+}
 
 const getLockSkip = R__default['default'].path(['lock', 'skip']);
 const isObj = v => {
@@ -509,112 +708,6 @@ function loadReference ({ DuckStorage, duckRack }) {
   duckRack.hook('before', 'create', checkReferencesExists);
 }
 
-function parsePath(text) {
-  return text.split('.')
-}
-
-function push(arr, el) {
-  const newArr = arr.slice();
-  newArr.push(el);
-  return newArr;
-}
-
-// names of the traps that can be registered with ES6's Proxy object
-const trapNames = [
-  'apply',
-  'construct',
-  'defineProperty',
-  'deleteProperty',
-  'enumerate',
-  'get',
-  'getOwnPropertyDescriptor',
-  'getPrototypeOf',
-  'has',
-  'isExtensible',
-  'ownKeys',
-  'preventExtensions',
-  'set',
-  'setPrototypeOf',
-];
-
-// a list of paramer indexes that indicate that the a recieves a key at that parameter
-// this information will be used to update the path accordingly
-const keys = {
-  get: 1,
-  set: 1,
-  deleteProperty: 1,
-  has: 1,
-  defineProperty: 1,
-  getOwnPropertyDescriptor: 1,
-};
-
-function DeepProxy(rootTarget, traps, options) {
-
-  let path = [];
-  let userData = {};
-
-  if (options !== undefined && typeof options.path !== 'undefined') {
-    path = parsePath(options.path);
-  }
-  if (options !== undefined && typeof options.userData !== 'undefined') {
-    userData = options.userData;
-  }
-
-  function createProxy(target, path) {
-
-    // avoid creating a new object between two traps
-    const context = { rootTarget, path };
-    Object.assign(context, userData);
-
-    const realTraps = {};
-
-    for (const trapName of trapNames) {
-      const keyParamIdx = keys[trapName]
-          , trap = traps[trapName];
-
-      if (typeof trap !== 'undefined') {
-
-        if (typeof keyParamIdx !== 'undefined') {
-
-          realTraps[trapName] = function () {
-
-            const key = arguments[keyParamIdx];
-
-            // update context for this trap
-            context.nest = function (nestedTarget) {
-              if (nestedTarget === undefined)
-                nestedTarget = rootTarget;
-              return createProxy(nestedTarget, push(path, key)); 
-            };
-
-            return trap.apply(context, arguments);
-          };
-        } else {
-
-          realTraps[trapName] = function () {
-
-            // update context for this trap
-            context.nest = function (nestedTarget) {
-              if (nestedTarget === undefined)
-                nestedTarget = {};
-              return createProxy(nestedTarget, path);
-            };
-
-            return trap.apply(context, arguments);
-          };
-        }
-      }
-    }
-
-    return new Proxy(target, realTraps);
-  }
-
-  return createProxy(rootTarget, path);
-
-}
-
-var proxyDeep = DeepProxy;
-
 duckfficer.Transformers.ObjectId = {
   settings: {
     autoCast: true,
@@ -636,29 +729,6 @@ duckfficer.Transformers.ObjectId = {
     if (!objectid.isValid(v)) {
       this.throwError('Invalid ObjectId');
     }
-  }
-};
-
-const UUIDPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-
-function uuid () {
-  // GUID / UUID RFC4122 version 4 taken from: https://stackoverflow.com/a/2117523/1064165
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-
-    return v.toString(16)
-  })
-}
-
-duckfficer.Transformers.uuid = {
-  settings: {
-    loaders: [{
-      type: String,
-      regex: [UUIDPattern, '{ value } is not a valid UUID']
-    }],
-    required: false,
-    default: uuid
   }
 };
 
@@ -1903,6 +1973,7 @@ exports.Duckfficer = duckfficer__namespace;
 exports.Duck = Duck;
 exports.DuckRack = DuckRack;
 exports.DuckStorageClass = DuckStorageClass;
+exports.DuckStorageClient = DuckStorageClient;
 exports.plugins = plugins;
 exports.registerDuckRacksFromDir = registerDuckRacksFromDir;
 exports.registerDuckRacksFromObj = registerDuckRacksFromObj;

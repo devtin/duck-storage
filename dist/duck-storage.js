@@ -261,7 +261,7 @@ var proxyDeep = DeepProxy;
 const getAppName = async () => {
   const nearestPackageJson = await pkgUp__default['default']();
   const packageName = nearestPackageJson ? require(nearestPackageJson).name : 'unknown';
-  return `duckstorage_${packageName}.`
+  return `duck-storage_${packageName}.`
 };
 
 const UUIDPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -295,17 +295,17 @@ const ipcConnect = async ({ appSpace, clientId }) => {
   });
 
   return new Promise((resolve, reject) => {
-    ipc__default['default'].connectTo('main', () => {
-      resolve(ipc__default['default'].of.main);
+    ipc__default['default'].connectTo('duck-storage', () => {
+      resolve(ipc__default['default'].of['duck-storage']);
     });
   })
 };
 
 const ipcDisconnect = async () => {
   return new Promise((resolve, reject) => {
-    ipc__default['default'].of.main.on('disconnect', resolve);
+    ipc__default['default'].of['duck-storage'].on('disconnect', resolve);
     setTimeout(() => reject(new Error('ipc disconnec time-dout')), 3000);
-    ipc__default['default'].disconnect('main');
+    ipc__default['default'].disconnect('duck-storage');
   })
 };
 
@@ -1747,7 +1747,7 @@ class DuckStorageClass extends events.EventEmitter {
 
     Object.assign(ipc__default['default'].config, {
       appspace,
-      id: 'main',
+      id: 'duck-storage',
       silent: true
     });
 

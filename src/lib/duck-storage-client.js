@@ -11,17 +11,17 @@ const ipcConnect = async ({ appSpace, clientId }) => {
   })
 
   return new Promise((resolve, reject) => {
-    ipc.connectTo('main', () => {
-      resolve(ipc.of.main)
+    ipc.connectTo('duck-storage', () => {
+      resolve(ipc.of['duck-storage'])
     })
   })
 }
 
 const ipcDisconnect = async () => {
   return new Promise((resolve, reject) => {
-    ipc.of.main.on('disconnect', resolve)
+    ipc.of['duck-storage'].on('disconnect', resolve)
     setTimeout(() => reject(new Error('ipc disconnec time-dout')), 3000)
-    ipc.disconnect('main')
+    ipc.disconnect('duck-storage')
   })
 }
 

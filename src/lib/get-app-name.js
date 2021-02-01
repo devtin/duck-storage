@@ -3,5 +3,5 @@ import pkgUp from 'pkg-up'
 export const getAppName = async () => {
   const nearestPackageJson = await pkgUp()
   const packageName = nearestPackageJson ? require(nearestPackageJson).name : 'unknown'
-  return `duckstorage_${packageName}.`
+  return `duck-storage_${packageName}.`
 }

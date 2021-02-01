@@ -66,7 +66,7 @@ export class DuckStorageClass extends EventEmitter {
 
     Object.assign(ipc.config, {
       appspace,
-      id: 'main',
+      id: 'duck-storage',
       silent: true
     })
 

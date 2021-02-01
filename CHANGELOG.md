@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.24](https://github.com/devtin/duck-storage/compare/v0.0.23...v0.0.24) (2021-02-01)
+
+
+### Bug Fixes
+
+* rename ipc id ([95ac2d2](https://github.com/devtin/duck-storage/commit/95ac2d24bc40bce482c04c9ef81d4af163425c45))
+
 ### [0.0.23](https://github.com/devtin/duck-storage/compare/v0.0.22...v0.0.23) (2021-01-30)
 
 

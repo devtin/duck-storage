@@ -140,6 +140,7 @@ export class DuckRack extends EventEmitter {
     return this._proxy
   }
 
+  // todo: think about this... feels like events should be method-related
   async dispatch (eventName, payload) {
     const eventKey = camelCase(eventName)
     eventName = kebabCase(eventName)
@@ -430,6 +431,10 @@ export class DuckRack extends EventEmitter {
     await this.trigger('after', 'deleteById', { _id, state, result })
 
     return result[0]
+  }
+
+  getModel (doc, state) {
+    return this.duckModel.getModel(doc, state)
   }
 
   consolidateDoc (state, { virtuals } = {}) {

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.25](https://github.com/devtin/duck-storage/compare/v0.0.24...v0.0.25) (2021-02-12)
+
+
+### Features
+
+* getModel ([50881cf](https://github.com/devtin/duck-storage/commit/50881cf0f846d81e1cad49f15c2672a7e82312bc))
+
 ### [0.0.24](https://github.com/devtin/duck-storage/compare/v0.0.23...v0.0.24) (2021-02-01)
 
 

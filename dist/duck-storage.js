@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.24
+ * duck-storage v0.0.25
  * (c) 2020-2021 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -1326,6 +1326,7 @@ class DuckRack extends events.EventEmitter {
     return this._proxy
   }
 
+  // todo: think about this... feels like events should be method-related
   async dispatch (eventName, payload) {
     const eventKey = camelCase__default['default'](eventName);
     eventName = kebabCase__default['default'](eventName);
@@ -1616,6 +1617,10 @@ class DuckRack extends events.EventEmitter {
     await this.trigger('after', 'deleteById', { _id, state, result });
 
     return result[0]
+  }
+
+  getModel (doc, state) {
+    return this.duckModel.getModel(doc, state)
   }
 
   consolidateDoc (state, { virtuals } = {}) {

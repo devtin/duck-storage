@@ -1,7 +1,7 @@
 {
   "name": "duck-storage",
   "version": "0.0.24",
-  "description": "event-base data-modeling framework",
+  "description": "event-based data-modeling ORM",
   "author": "Martin Rafael Gonzalez <tin@devtin.io>",
   "main": "dist/duck-storage.js",
   "scripts": {

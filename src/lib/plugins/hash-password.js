@@ -8,11 +8,11 @@ const { obj2dot } = Utils
 
 export default function ({ DuckStorage, duckRack }) {
   async function encryptPasswords (entry, fields) {
-    const fieldsToEncrypt = this.duckModel
+    const fieldsToEncrypt = duckRack.duckModel
       .schema
       .paths
       .filter((path) => {
-        return (fields && fields.indexOf(path) >= 0) || (!fields && this.duckModel.schema.schemaAtPath(path).type === 'Password')
+        return (fields && fields.indexOf(path) >= 0) || (!fields && duckRack.duckModel.schema.schemaAtPath(path).type === 'Password')
       })
 
     for (const field of fieldsToEncrypt) {
@@ -26,7 +26,7 @@ export default function ({ DuckStorage, duckRack }) {
   duckRack.hook('before', 'update', async function ({ oldEntry, newEntry, entry }) {
     const toHash = []
     obj2dot(newEntry).forEach((path) => {
-      if (this.duckModel.schema.schemaAtPath(path).type === 'Password') {
+      if (duckRack.duckModel.schema.schemaAtPath(path).type === 'Password') {
         toHash.push(path)
       }
     })

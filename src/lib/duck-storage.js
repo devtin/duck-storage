@@ -3,6 +3,8 @@ import ipc from 'node-ipc'
 import { EventEmitter } from 'events'
 import { getAppName } from './get-app-name.js'
 import lock from './plugins/lock'
+import uniqueKeys from './plugins/unique-keys'
+import hashPassword from './plugins/hash-password.js'
 import loadReference from './plugins/load-reference'
 import { Duck } from './duck'
 import { DuckRack } from './duck-rack'
@@ -26,7 +28,7 @@ export class DuckStorageClass extends EventEmitter {
   } = {}) {
     super()
     this.store = Object.create(null)
-    this.plugins = [loadReference, /* uniqueKeys, */lock()].concat(plugins)
+    this.plugins = [loadReference, hashPassword, uniqueKeys, lock()].concat(plugins)
 
     // todo: implement event's store
     // todo: implement error's store

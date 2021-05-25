@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.26](https://github.com/devtin/duck-storage/compare/v0.0.25...v0.0.26) (2021-05-25)
+
+
+### Features
+
+* remap fn callback ([cc11477](https://github.com/devtin/duck-storage/commit/cc114779ed570ed179cca6a9b986903fb1ae3d33))
+* ships with unique-keys and password hash ([dbf5160](https://github.com/devtin/duck-storage/commit/dbf5160cb26dc823991560526d5eb930948a2cca))
+
 ### [0.0.25](https://github.com/devtin/duck-storage/compare/v0.0.24...v0.0.25) (2021-02-12)
 
 

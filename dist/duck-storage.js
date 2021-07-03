@@ -180,7 +180,7 @@ duckfficer.Transformers.Password = {
 
 const { obj2dot } = duckfficer.Utils;
 
-function HashPassword ({ DuckStorage, duckRack }) {
+const HashPassword = function ({ DuckStorage, duckRack }) {
   async function encryptPasswords (entry, fields) {
     const fieldsToEncrypt = duckRack.duckModel
       .schema
@@ -213,7 +213,11 @@ function HashPassword ({ DuckStorage, duckRack }) {
       entry
     }
   });
-}
+};
+
+HashPassword.comparePasswords = (decrypted, encrypted) => {
+  return bcrypt__default['default'].compare(decrypted, encrypted)
+};
 
 function parsePath(text) {
   return text.split('.')

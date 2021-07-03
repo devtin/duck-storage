@@ -6,11 +6,7 @@ import '../types/password'
 
 const { obj2dot } = Utils
 
-export const comparePasswords = (decrypted, encrypted) => {
-  return bcrypt.compare(decrypted, encrypted)
-}
-
-export default function ({ DuckStorage, duckRack }) {
+const HashPassword = function ({ DuckStorage, duckRack }) {
   async function encryptPasswords (entry, fields) {
     const fieldsToEncrypt = duckRack.duckModel
       .schema
@@ -44,3 +40,9 @@ export default function ({ DuckStorage, duckRack }) {
     }
   })
 }
+
+HashPassword.comparePasswords = (decrypted, encrypted) => {
+  return bcrypt.compare(decrypted, encrypted)
+}
+
+export default HashPassword

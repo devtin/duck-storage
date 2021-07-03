@@ -159,22 +159,10 @@ duckfficer.Transformers.Password = {
     required: false
   },
   loaders: [String],
-  validate (value, { state }) {
-    if (state.method === 'create' && !value) {
+  validate (value) {
+    if (!value) {
       this.throwError('Please enter a valid password', { value });
     }
-  },
-  parse (v, { state }) {
-    if (
-      state.method === 'create' ||
-      (
-        state.method === 'update' &&
-        duckfficer.Utils.find(state.oldEntry || {}, this.fullPath) !== v
-      )
-    ) {
-      return bcrypt__default['default'].hash(v, 10)
-    }
-    return v
   }
 };
 

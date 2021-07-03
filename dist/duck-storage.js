@@ -10,14 +10,14 @@ Object.defineProperty(exports, '__esModule', { value: true });
 var cloneDeep = require('lodash/cloneDeep');
 var duckfficer = require('duckfficer');
 var sift = require('sift');
+var bcrypt = require('bcrypt');
+var set = require('lodash/set');
+var get = require('lodash/get');
 var ipc = require('node-ipc');
 var pkgUp = require('pkg-up');
 var events = require('events');
 var R = require('ramda');
-var get = require('lodash/get');
 var deepObjectDiff = require('deep-object-diff');
-var bcrypt = require('bcrypt');
-var set = require('lodash/set');
 var camelCase = require('lodash/camelCase');
 var kebabCase = require('lodash/kebabCase');
 var unset = require('lodash/unset');
@@ -50,12 +50,12 @@ function _interopNamespace(e) {
 var cloneDeep__default = /*#__PURE__*/_interopDefaultLegacy(cloneDeep);
 var duckfficer__namespace = /*#__PURE__*/_interopNamespace(duckfficer);
 var sift__default = /*#__PURE__*/_interopDefaultLegacy(sift);
+var bcrypt__default = /*#__PURE__*/_interopDefaultLegacy(bcrypt);
+var set__default = /*#__PURE__*/_interopDefaultLegacy(set);
+var get__default = /*#__PURE__*/_interopDefaultLegacy(get);
 var ipc__default = /*#__PURE__*/_interopDefaultLegacy(ipc);
 var pkgUp__default = /*#__PURE__*/_interopDefaultLegacy(pkgUp);
 var R__default = /*#__PURE__*/_interopDefaultLegacy(R);
-var get__default = /*#__PURE__*/_interopDefaultLegacy(get);
-var bcrypt__default = /*#__PURE__*/_interopDefaultLegacy(bcrypt);
-var set__default = /*#__PURE__*/_interopDefaultLegacy(set);
 var camelCase__default = /*#__PURE__*/_interopDefaultLegacy(camelCase);
 var kebabCase__default = /*#__PURE__*/_interopDefaultLegacy(kebabCase);
 var unset__default = /*#__PURE__*/_interopDefaultLegacy(unset);
@@ -152,6 +152,67 @@ function InMemory ({ storeKey = {} } = {}) {
       }
     });
   }
+}
+
+duckfficer.Transformers.Password = {
+  settings: {
+    required: false
+  },
+  loaders: [String],
+  validate (value, { state }) {
+    if (state.method === 'create' && !value) {
+      this.throwError('Please enter a valid password', { value });
+    }
+  },
+  parse (v, { state }) {
+    if (
+      state.method === 'create' ||
+      (
+        state.method === 'update' &&
+        duckfficer.Utils.find(state.oldEntry || {}, this.fullPath) !== v
+      )
+    ) {
+      return bcrypt__default['default'].hash(v, 10)
+    }
+    return v
+  }
+};
+
+const { obj2dot } = duckfficer.Utils;
+
+function HashPassword ({ DuckStorage, duckRack }) {
+  async function encryptPasswords (entry, fields) {
+    const fieldsToEncrypt = duckRack.duckModel
+      .schema
+      .paths
+      .filter((path) => {
+        return (fields && fields.indexOf(path) >= 0) || (!fields && duckRack.duckModel.schema.schemaAtPath(path).type === 'Password')
+      });
+
+    for (const field of fieldsToEncrypt) {
+      set__default['default'](entry, field, await bcrypt__default['default'].hash(get__default['default'](entry, field), 10));
+    }
+
+    return entry
+  }
+
+  duckRack.hook('before', 'create', ({ entry }) => encryptPasswords(entry));
+  duckRack.hook('before', 'update', async function ({ oldEntry, newEntry, entry }) {
+    const toHash = [];
+    obj2dot(newEntry).forEach((path) => {
+      if (duckRack.duckModel.schema.schemaAtPath(path).type === 'Password') {
+        toHash.push(path);
+      }
+    });
+
+    await encryptPasswords.call(this, entry, toHash);
+
+    return {
+      oldEntry,
+      newEntry,
+      entry
+    }
+  });
 }
 
 function parsePath(text) {
@@ -711,67 +772,6 @@ function uniqueKeys ({ duckRack }) {
   duckRack.hook('before', 'create', checkPrimaryKeys);
   duckRack.hook('before', 'update', async ({ oldEntry, newEntry, entry }) => {
     await checkPrimaryKeys({ entry });
-    return {
-      oldEntry,
-      newEntry,
-      entry
-    }
-  });
-}
-
-duckfficer.Transformers.Password = {
-  settings: {
-    required: false
-  },
-  loaders: [String],
-  validate (value, { state }) {
-    if (state.method === 'create' && !value) {
-      this.throwError('Please enter a valid password', { value });
-    }
-  },
-  parse (v, { state }) {
-    if (
-      state.method === 'create' ||
-      (
-        state.method === 'update' &&
-        duckfficer.Utils.find(state.oldEntry || {}, this.fullPath) !== v
-      )
-    ) {
-      return bcrypt__default['default'].hash(v, 10)
-    }
-    return v
-  }
-};
-
-const { obj2dot } = duckfficer.Utils;
-
-function hashPassword ({ DuckStorage, duckRack }) {
-  async function encryptPasswords (entry, fields) {
-    const fieldsToEncrypt = duckRack.duckModel
-      .schema
-      .paths
-      .filter((path) => {
-        return (fields && fields.indexOf(path) >= 0) || (!fields && duckRack.duckModel.schema.schemaAtPath(path).type === 'Password')
-      });
-
-    for (const field of fieldsToEncrypt) {
-      set__default['default'](entry, field, await bcrypt__default['default'].hash(get__default['default'](entry, field), 10));
-    }
-
-    return entry
-  }
-
-  duckRack.hook('before', 'create', ({ entry }) => encryptPasswords(entry));
-  duckRack.hook('before', 'update', async function ({ oldEntry, newEntry, entry }) {
-    const toHash = [];
-    obj2dot(newEntry).forEach((path) => {
-      if (duckRack.duckModel.schema.schemaAtPath(path).type === 'Password') {
-        toHash.push(path);
-      }
-    });
-
-    await encryptPasswords.call(this, entry, toHash);
-
     return {
       oldEntry,
       newEntry,
@@ -1798,7 +1798,7 @@ class DuckStorageClass extends events.EventEmitter {
   } = {}) {
     super();
     this.store = Object.create(null);
-    this.plugins = [loadReference, hashPassword, uniqueKeys, lock()].concat(plugins);
+    this.plugins = [loadReference, HashPassword, uniqueKeys, lock()].concat(plugins);
 
     // todo: implement event's store
     // todo: implement error's store
@@ -2057,7 +2057,8 @@ async function registerDuckRacksFromDir (duckStorage, directory, remap = (obj) =
 }
 
 const plugins = {
-  InMemory
+  InMemory,
+  HashPassword
 };
 
 exports.Duckfficer = duckfficer__namespace;

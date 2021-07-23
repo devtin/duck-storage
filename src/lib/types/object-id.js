@@ -14,7 +14,7 @@ Transformers.ObjectId = {
   },
   async parse (v, { state }) {
     if (ObjectId.isValid(v)) {
-      return ObjectId(v).toString()
+      return ObjectId(v)
     }
     return v
   },

@@ -16,6 +16,7 @@ export default function ({ DuckStorage, duckRack }) {
         return { duckRack: duckModel.schema.schemaAtPath(path).settings.duckRack, _id, path }
       })
   }
+
   async function checkReferencesExists ({ entry }) {
     const entriesToLoad = getReferences(this.duckModel, entry)
 
@@ -27,15 +28,26 @@ export default function ({ DuckStorage, duckRack }) {
     }
   }
 
-  async function loadReferences ({ entry, state }) {
+  async function loadReferences ({ entry }) {
     const entriesToLoad = getReferences(this.duckModel, entry)
 
     for (const entryToLoad of entriesToLoad) {
-      set(entry, entryToLoad.path, await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id))
+      const foundReference = await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id)
+      set(entry, entryToLoad.path, foundReference)
     }
+
+    return entry
   }
 
-  duckRack.hook('after', 'read', loadReferences)
-  duckRack.hook('after', 'create', loadReferences)
+  const loadBulkReferences = async function ({ result }) {
+    const promisesToLoad = result.map((entry) => {
+      return loadReferences.call(this, { entry })
+    })
+    await Promise.all(promisesToLoad)
+  }
+
   duckRack.hook('before', 'create', checkReferencesExists)
+  duckRack.hook('after', 'create', loadReferences)
+  duckRack.hook('after', 'read', loadReferences)
+  duckRack.hook('after', 'list', loadBulkReferences)
 }

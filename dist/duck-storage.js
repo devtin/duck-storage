@@ -1,5 +1,5 @@
 /*!
- * duck-storage v0.0.29
+ * duck-storage v0.0.30
  * (c) 2020-2021 Martin Rafael Gonzalez <tin@devtin.io>
  * MIT
  */
@@ -1317,7 +1317,6 @@ const objectHasBeenModified = (objA, objB) => {
   let modified = false;
   Object.keys(diff).forEach((key) => {
     Object.keys(diff[key]).forEach(prop => {
-
       if (modified) {
         return
       }
@@ -1654,7 +1653,7 @@ class DuckRack extends events.EventEmitter {
 
       const entry = await this.schema.parse(this.withoutVirtuals(composedNewEntry), { state });
       // rethink this
-/*
+      /*
       if (!objectHasBeenModified(oldEntry, entry)) {
         newEntries.push(oldEntry)
         continue
@@ -1722,7 +1721,7 @@ class DuckRack extends events.EventEmitter {
     await this.trigger('before', 'deleteById', { _id, state, result });
     await this.trigger('after', 'deleteById', { _id, state, result });
 
-    const model = await this.getModel(result[0],{ method: 'delete' });
+    const model = await this.getModel(result[0], { method: 'delete' });
     return model.consolidate()
   }
 
@@ -1733,7 +1732,7 @@ class DuckRack extends events.EventEmitter {
   consolidateDoc (state, { virtuals } = {}) {
     return async (doc) => {
       return this.duckModel.getModel(doc, state)
-/*
+      /*
       console.log({entry})
       const consolidatedEntry = await entry.consolidate({ virtualsEnumerable: virtuals })
       console.log({consolidatedEntry})

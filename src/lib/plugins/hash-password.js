@@ -4,9 +4,9 @@ import get from 'lodash/get'
 import { Utils } from 'duckfficer'
 import '../types/password'
 
-const { obj2dot } = Utils
+const { obj2dot, find } = Utils
 
-const HashPassword = function ({ DuckStorage, duckRack }) {
+const HashPassword = function ({ duckRack }) {
   async function encryptPasswords (entry, fields) {
     const fieldsToEncrypt = duckRack.duckModel
       .schema
@@ -26,8 +26,14 @@ const HashPassword = function ({ DuckStorage, duckRack }) {
   duckRack.hook('before', 'update', async function ({ oldEntry, newEntry, entry }) {
     const toHash = []
     obj2dot(newEntry).forEach((path) => {
-      if (duckRack.duckModel.schema.schemaAtPath(path).type === 'Password') {
-        toHash.push(path)
+      // check if password was modified
+      // fixes ObjectId objects throwing
+      const schema = duckRack.duckModel.schema.schemaAtPath(path)
+      if (schema && schema.type === 'Password') {
+        // re-encrypt if it changed
+        if (find(oldEntry, path) !== find(entry, path)) {
+          toHash.push(path)
+        }
       }
     })
 

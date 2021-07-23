@@ -166,9 +166,9 @@ duckfficer.Transformers.Password = {
   }
 };
 
-const { obj2dot } = duckfficer.Utils;
+const { obj2dot, find } = duckfficer.Utils;
 
-const HashPassword = function ({ DuckStorage, duckRack }) {
+const HashPassword = function ({ duckRack }) {
   async function encryptPasswords (entry, fields) {
     const fieldsToEncrypt = duckRack.duckModel
       .schema
@@ -188,8 +188,14 @@ const HashPassword = function ({ DuckStorage, duckRack }) {
   duckRack.hook('before', 'update', async function ({ oldEntry, newEntry, entry }) {
     const toHash = [];
     obj2dot(newEntry).forEach((path) => {
-      if (duckRack.duckModel.schema.schemaAtPath(path).type === 'Password') {
-        toHash.push(path);
+      // check if password was modified
+      // fixes ObjectId objects throwing
+      const schema = duckRack.duckModel.schema.schemaAtPath(path);
+      if (schema && schema.type === 'Password') {
+        // re-encrypt if it changed
+        if (find(oldEntry, path) !== find(entry, path)) {
+          toHash.push(path);
+        }
       }
     });
 
@@ -786,6 +792,7 @@ function loadReference ({ DuckStorage, duckRack }) {
         return { duckRack: duckModel.schema.schemaAtPath(path).settings.duckRack, _id, path }
       })
   };
+
   async function checkReferencesExists ({ entry }) {
     const entriesToLoad = getReferences(this.duckModel, entry);
 
@@ -797,17 +804,28 @@ function loadReference ({ DuckStorage, duckRack }) {
     }
   }
 
-  async function loadReferences ({ entry, state }) {
+  async function loadReferences ({ entry }) {
     const entriesToLoad = getReferences(this.duckModel, entry);
 
     for (const entryToLoad of entriesToLoad) {
-      set__default['default'](entry, entryToLoad.path, await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id));
+      const foundReference = await DuckStorage.getRackByName(entryToLoad.duckRack).findOneById(entryToLoad._id);
+      set__default['default'](entry, entryToLoad.path, foundReference);
     }
+
+    return entry
   }
 
-  duckRack.hook('after', 'read', loadReferences);
-  duckRack.hook('after', 'create', loadReferences);
+  const loadBulkReferences = async function ({ result }) {
+    const promisesToLoad = result.map((entry) => {
+      return loadReferences.call(this, { entry })
+    });
+    await Promise.all(promisesToLoad);
+  };
+
   duckRack.hook('before', 'create', checkReferencesExists);
+  duckRack.hook('after', 'create', loadReferences);
+  duckRack.hook('after', 'read', loadReferences);
+  duckRack.hook('after', 'list', loadBulkReferences);
 }
 
 duckfficer.Transformers.ObjectId = {
@@ -823,7 +841,7 @@ duckfficer.Transformers.ObjectId = {
   },
   async parse (v, { state }) {
     if (objectid.isValid(v)) {
-      return objectid(v).toString()
+      return objectid(v)
     }
     return v
   },
@@ -1299,11 +1317,12 @@ const objectHasBeenModified = (objA, objB) => {
   let modified = false;
   Object.keys(diff).forEach((key) => {
     Object.keys(diff[key]).forEach(prop => {
+
       if (modified) {
         return
       }
 
-      modified = Object.keys(diff[key][prop]).length > 0;
+      modified = !!diff[key][prop];
     });
   });
   return modified
@@ -1554,7 +1573,14 @@ class DuckRack extends events.EventEmitter {
     const entryModel = await this.duckModel.getModel(entry, state);
     const createdEntry = await entryModel.consolidate({ virtualsEnumerable: true });
     await this.trigger('after', 'create', { entry: createdEntry, state });
+
     this.emit('create', { entry: createdEntry, state });
+
+    if (objectHasBeenModified(entry, createdEntry)) {
+      await this.update({
+        _id: entry._id
+      }, createdEntry);
+    }
 
     return createdEntry
   }
@@ -1627,11 +1653,13 @@ class DuckRack extends events.EventEmitter {
       const composedNewEntry = Object.assign(cloneDeep__default['default'](oldEntry), newEntry);
 
       const entry = await this.schema.parse(this.withoutVirtuals(composedNewEntry), { state });
-
+      // rethink this
+/*
       if (!objectHasBeenModified(oldEntry, entry)) {
-        newEntries.push(oldEntry);
+        newEntries.push(oldEntry)
         continue
       }
+*/
 
       newEntry._v = entry._v = oldEntry._v + 1;
       const result = [];
@@ -1694,7 +1722,8 @@ class DuckRack extends events.EventEmitter {
     await this.trigger('before', 'deleteById', { _id, state, result });
     await this.trigger('after', 'deleteById', { _id, state, result });
 
-    return result[0]
+    const model = await this.getModel(result[0],{ method: 'delete' });
+    return model.consolidate()
   }
 
   getModel (doc, state) {
@@ -1703,8 +1732,13 @@ class DuckRack extends events.EventEmitter {
 
   consolidateDoc (state, { virtuals } = {}) {
     return async (doc) => {
-      const entry = await this.duckModel.getModel(doc, state);
-      return entry.consolidate({ virtualsEnumerable: virtuals })
+      return this.duckModel.getModel(doc, state)
+/*
+      console.log({entry})
+      const consolidatedEntry = await entry.consolidate({ virtualsEnumerable: virtuals })
+      console.log({consolidatedEntry})
+      return entry
+*/
     }
   }
 
@@ -1718,7 +1752,8 @@ class DuckRack extends events.EventEmitter {
     return this.storeKey[_id] !== undefined
   }
 
-  async findOneById (_id, { _v, state = {}, raw = false } = {}) {
+  async findOneById (givenId, { _v, state = {}, raw = false } = {}) {
+    const _id = typeof givenId === 'string' ? objectid(givenId) : givenId;
     Object.assign(state, {
       method: 'findOneById'
     });

@@ -35,11 +35,12 @@ const objectHasBeenModified = (objA, objB) => {
   let modified = false
   Object.keys(diff).forEach((key) => {
     Object.keys(diff[key]).forEach(prop => {
+
       if (modified) {
         return
       }
 
-      modified = Object.keys(diff[key][prop]).length > 0
+      modified = !!diff[key][prop]
     })
   })
   return modified
@@ -290,7 +291,14 @@ export class DuckRack extends EventEmitter {
     const entryModel = await this.duckModel.getModel(entry, state)
     const createdEntry = await entryModel.consolidate({ virtualsEnumerable: true })
     await this.trigger('after', 'create', { entry: createdEntry, state })
+
     this.emit('create', { entry: createdEntry, state })
+
+    if (objectHasBeenModified(entry, createdEntry)) {
+      await this.update({
+        _id: entry._id
+      }, createdEntry)
+    }
 
     return createdEntry
   }
@@ -363,11 +371,13 @@ export class DuckRack extends EventEmitter {
       const composedNewEntry = Object.assign(cloneDeep(oldEntry), newEntry)
 
       const entry = await this.schema.parse(this.withoutVirtuals(composedNewEntry), { state })
-
+      // rethink this
+/*
       if (!objectHasBeenModified(oldEntry, entry)) {
         newEntries.push(oldEntry)
         continue
       }
+*/
 
       newEntry._v = entry._v = oldEntry._v + 1
       const result = []
@@ -430,7 +440,8 @@ export class DuckRack extends EventEmitter {
     await this.trigger('before', 'deleteById', { _id, state, result })
     await this.trigger('after', 'deleteById', { _id, state, result })
 
-    return result[0]
+    const model = await this.getModel(result[0],{ method: 'delete' })
+    return model.consolidate()
   }
 
   getModel (doc, state) {
@@ -439,8 +450,13 @@ export class DuckRack extends EventEmitter {
 
   consolidateDoc (state, { virtuals } = {}) {
     return async (doc) => {
-      const entry = await this.duckModel.getModel(doc, state)
-      return entry.consolidate({ virtualsEnumerable: virtuals })
+      return this.duckModel.getModel(doc, state)
+/*
+      console.log({entry})
+      const consolidatedEntry = await entry.consolidate({ virtualsEnumerable: virtuals })
+      console.log({consolidatedEntry})
+      return entry
+*/
     }
   }
 
@@ -454,7 +470,8 @@ export class DuckRack extends EventEmitter {
     return this.storeKey[_id] !== undefined
   }
 
-  async findOneById (_id, { _v, state = {}, raw = false } = {}) {
+  async findOneById (givenId, { _v, state = {}, raw = false } = {}) {
+    const _id = typeof givenId === 'string' ? ObjectId(givenId) : givenId
     Object.assign(state, {
       method: 'findOneById'
     })

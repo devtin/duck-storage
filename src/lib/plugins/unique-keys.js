@@ -2,7 +2,9 @@ import get from 'lodash/get'
 import { diff } from 'deep-object-diff'
 import ObjectId from 'bson-objectid'
 
-export default function ({ duckRack }) {
+export const name = 'unique-keys'
+
+export function handler ({ duckRack }) {
   const keys = {}
   duckRack.duckModel.schema.children.forEach(schema => {
     if (schema.settings.unique) {

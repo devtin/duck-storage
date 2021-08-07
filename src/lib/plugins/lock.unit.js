@@ -1,5 +1,5 @@
 import test from 'ava'
-import LockPlugin from './lock'
+import { handler as LockPlugin } from './lock'
 
 const getFake = ({ lockTimeout = 10 } = {}) => {
   const duckRack = {

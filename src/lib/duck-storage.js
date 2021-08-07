@@ -1,12 +1,12 @@
-import { Schema, Utils } from 'duckfficer'
+import { Utils } from 'duckfficer'
 import ipc from 'node-ipc'
 import { EventEmitter } from 'events'
 import { getAppName } from './get-app-name.js'
 import lock from './plugins/lock'
-import uniqueKeys from './plugins/unique-keys'
-import hashPassword from './plugins/hash-password.js'
-import loadReference from './plugins/load-reference'
-import { Duck } from './duck'
+import * as uniqueKeys from './plugins/unique-keys'
+import * as hashPassword from './plugins/hash-password.js'
+import * as loadReference from './plugins/load-reference'
+import * as stateLogger from './plugins/state-logger.js'
 import { DuckRack } from './duck-rack'
 const { PromiseEach } = Utils
 
@@ -28,33 +28,11 @@ export class DuckStorageClass extends EventEmitter {
   } = {}) {
     super()
     this.store = Object.create(null)
-    this.plugins = [loadReference, hashPassword, uniqueKeys, lock()].concat(plugins)
+    this.plugins = [loadReference, hashPassword, uniqueKeys, lock(), stateLogger].concat(plugins)
 
     // todo: implement event's store
     // todo: implement error's store
     return (async () => {
-      this.eventsRack = await new DuckRack('$events', {
-        duckModel: new Duck({
-          schema: new Schema({
-            rack: String,
-            event: String,
-            payload: Object,
-            date: Date
-          })
-        })
-      })
-
-      this.errorsRack = await new DuckRack('$errors', {
-        duckModel: new Duck({
-          schema: new Schema({
-            rack: String,
-            message: String,
-            payload: Object,
-            date: Date
-          })
-        })
-      })
-
       if (setupIpc) {
         await this.setupIpc(appName)
       }
@@ -134,23 +112,8 @@ export class DuckStorageClass extends EventEmitter {
     })
   }
 
-  logEvent (eventName, { rack, payload }) {
-    this.eventsRack
-      .create({
-        rack: rack.name,
-        event: eventName,
-        payload,
-        date: Date.now()
-      })
-      .catch(() => {
-        // todo: log using logger
-      })
-  }
-
   _wireRack (rack) {
     rack.on('create', (payload) => {
-      this.logEvent('create', { rack, payload })
-
       this.emit('create', {
         entityName: rack.name,
         payload
@@ -158,8 +121,6 @@ export class DuckStorageClass extends EventEmitter {
     })
 
     rack.on('read', (payload) => {
-      this.logEvent('read', { rack, payload })
-
       this.emit('read', {
         entityName: rack.name,
         payload
@@ -167,32 +128,24 @@ export class DuckStorageClass extends EventEmitter {
     })
 
     rack.on('update', (payload) => {
-      this.logEvent('update', { rack, payload })
-
       this.emit('update', {
         entityName: rack.name,
         payload
       })
     })
     rack.on('delete', (payload) => {
-      this.logEvent('delete', { rack, payload })
-
       this.emit('delete', {
         entityName: rack.name,
         payload
       })
     })
     rack.on('list', (payload) => {
-      this.logEvent('list', { rack, payload })
-
       this.emit('list', {
         entityName: rack.name,
         payload
       })
     })
     rack.on('method', (payload) => {
-      this.logEvent('method', { rack, payload })
-
       this.emit('method', {
         entityName: rack.name,
         payload
@@ -226,8 +179,12 @@ export class DuckStorageClass extends EventEmitter {
     }
 
     this.store[duckRack.name] = duckRack
-    await PromiseEach(this.plugins, fn => {
-      return fn({ DuckStorage: this, duckRack })
+    await PromiseEach(this.plugins, async ({ handler, name }) => {
+      try {
+        await handler({ DuckStorage: this, duckRack })
+      } catch (err) {
+        console.log('DuckStoragePluginError', name, err)
+      }
     })
     this._wireRack(duckRack)
     return duckRack

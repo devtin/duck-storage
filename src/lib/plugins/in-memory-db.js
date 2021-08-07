@@ -2,7 +2,9 @@ import cloneDeep from 'lodash/cloneDeep'
 import { Schema, Utils } from 'duckfficer'
 import sift from 'sift'
 
-export default function ({ storeKey = {} } = {}) {
+export const name = 'in-memory-db'
+
+export function handler ({ storeKey = {} } = {}) {
   const sortArray = (arr, sort) => {
     const toIndex = (value) => {
       if (typeof value === 'boolean') {

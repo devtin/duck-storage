@@ -6,7 +6,9 @@ import '../types/password'
 
 const { obj2dot, find } = Utils
 
-const HashPassword = function ({ duckRack }) {
+export const name = 'hash-password'
+
+export function handler ({ duckRack }) {
   async function encryptPasswords (entry, fields) {
     const fieldsToEncrypt = duckRack.duckModel
       .schema
@@ -47,8 +49,6 @@ const HashPassword = function ({ duckRack }) {
   })
 }
 
-HashPassword.comparePasswords = (decrypted, encrypted) => {
+handler.comparePasswords = (decrypted, encrypted) => {
   return bcrypt.compare(decrypted, encrypted)
 }
-
-export default HashPassword

@@ -2,7 +2,9 @@ import { Utils } from 'duckfficer'
 import set from 'lodash/set'
 import ObjectId from 'bson-objectid'
 
-export default function ({ DuckStorage, duckRack }) {
+export const name = 'load-reference'
+
+export function handler ({ DuckStorage, duckRack }) {
   const getReferences = (duckModel, entry) => {
     return duckModel
       .schema

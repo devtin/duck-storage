@@ -1,5 +1,5 @@
-import InMemory from './lib/plugins/in-memory-db.js'
-import HashPassword from './lib/plugins/hash-password.js'
+import * as InMemory from './lib/plugins/in-memory-db.js'
+import * as HashPassword from './lib/plugins/hash-password.js'
 export { DuckStorageClient } from './lib/duck-storage-client.js'
 export { DuckStorageClass } from './lib/duck-storage.js'
 export { DuckRack } from './lib/duck-rack.js'

@@ -35,7 +35,6 @@ const objectHasBeenModified = (objA, objB) => {
   let modified = false
   Object.keys(diff).forEach((key) => {
     Object.keys(diff[key]).forEach(prop => {
-
       if (modified) {
         return
       }
@@ -177,7 +176,7 @@ export class DuckRack extends EventEmitter {
     await this.trigger('before', 'apply', { id, _v, method, path, payload, state })
 
     const getDoc = async () => {
-      const doc = await this.findOneById(id, {})
+      const doc = await this.findOneById(id)
 
       if (!doc) {
         throw new Error('document not found')
@@ -191,6 +190,8 @@ export class DuckRack extends EventEmitter {
     if (!doc) {
       throw new Error('document not found')
     }
+
+    const oldDoc = JSON.parse(JSON.stringify(doc))
 
     if (validate) {
       // custom doc validation
@@ -246,10 +247,14 @@ export class DuckRack extends EventEmitter {
       const updating = pick(doc, this.duckModel.schema.ownPaths)
       entryResult = (await this.update(id, updating, state))[0]
       eventTrapper.dispatch(this)
+
+      if (typeof methodResult === 'function') {
+        methodResult = await methodResult(entryResult)
+      }
     } catch (err) {
       error = err
     }
-    await this.trigger('after', 'apply', { id, _v, method, payload, state, error, methodResult, entryResult, eventsTrapped: eventTrapper.trapped })
+    await this.trigger('after', 'apply', { id, _v, method, payload, state, path, error, oldDoc, methodResult, entryResult, eventsTrapped: eventTrapper.trapped })
 
     if (error) {
       throw error
@@ -352,7 +357,7 @@ export class DuckRack extends EventEmitter {
       method: 'update'
     })
 
-    const entries = (await this.list(query, { state, raw: true, virtuals: false })).map(oldEntry => {
+    const entries = (await this.list(query, { state: Object.assign({}, state), raw: true, virtuals: false })).map(oldEntry => {
       if (newEntry && newEntry._id && !ObjectId(oldEntry._id).equals(newEntry._id)) {
         throw new Error('_id\'s cannot be modified')
       }
@@ -372,7 +377,7 @@ export class DuckRack extends EventEmitter {
 
       const entry = await this.schema.parse(this.withoutVirtuals(composedNewEntry), { state })
       // rethink this
-/*
+      /*
       if (!objectHasBeenModified(oldEntry, entry)) {
         newEntries.push(oldEntry)
         continue
@@ -440,7 +445,7 @@ export class DuckRack extends EventEmitter {
     await this.trigger('before', 'deleteById', { _id, state, result })
     await this.trigger('after', 'deleteById', { _id, state, result })
 
-    const model = await this.getModel(result[0],{ method: 'delete' })
+    const model = await this.getModel(result[0], { method: 'delete' })
     return model.consolidate()
   }
 
@@ -451,7 +456,7 @@ export class DuckRack extends EventEmitter {
   consolidateDoc (state, { virtuals } = {}) {
     return async (doc) => {
       return this.duckModel.getModel(doc, state)
-/*
+      /*
       console.log({entry})
       const consolidatedEntry = await entry.consolidate({ virtualsEnumerable: virtuals })
       console.log({consolidatedEntry})

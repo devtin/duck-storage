@@ -89,7 +89,6 @@ export const name = 'state-logger'
 export async function handler ({ DuckStorage, duckRack }) {
   await registerStateLoggerCollection(DuckStorage)
 
-  console.log('duckRack.name', duckRack.name)
   if (duckRack.name === STATE_LOGGER_COLLECTION) {
     return
   }

@@ -65,96 +65,99 @@ var Promise__default = /*#__PURE__*/_interopDefaultLegacy(Promise$1);
 
 const name$4 = 'in-memory-db';
 
-function handler$4 ({ storeKey = {} } = {}) {
-  const sortArray = (arr, sort) => {
-    const toIndex = (value) => {
-      if (typeof value === 'boolean') {
-        return value ? 1 : -1
-      }
-      return value
-    };
-    const calcIndex = (a, b, factor = 1) => {
-      if (a === b) {
-        return 0
-      }
+const storeKey = {};
 
-      if (typeof a === 'string' && typeof b === 'string') {
-        return toIndex(a > b) * factor
-      }
-      const A = toIndex(a);
-      const B = toIndex(b);
+const sortArray = (arr, sort) => {
+  const toIndex = (value) => {
+    if (typeof value === 'boolean') {
+      return value ? 1 : -1
+    }
+    return value
+  };
+  const calcIndex = (a, b, factor = 1) => {
+    if (a === b) {
+      return 0
+    }
 
-      return (A - B) * factor
-    };
+    if (typeof a === 'string' && typeof b === 'string') {
+      return toIndex(a > b) * factor
+    }
+    const A = toIndex(a);
+    const B = toIndex(b);
 
-    duckfficer.Utils.obj2dot(sort).reverse().forEach(prop => {
-      arr = arr.sort((a, b) => {
-        return calcIndex(duckfficer.Utils.find(a, prop), duckfficer.Utils.find(b, prop), toIndex(duckfficer.Utils.find(sort, prop)))
-      });
+    return (A - B) * factor
+  };
+
+  duckfficer.Utils.obj2dot(sort).reverse().forEach(prop => {
+    arr = arr.sort((a, b) => {
+      return calcIndex(duckfficer.Utils.find(a, prop), duckfficer.Utils.find(b, prop), toIndex(duckfficer.Utils.find(sort, prop)))
     });
-    return arr
-  };
+  });
+  return arr
+};
 
-  const runQuery = (entity, query) => {
-    return entity.filter(sift__default['default'](query))
-  };
+const runQuery = (entity, query) => {
+  return entity.filter(sift__default['default'](query))
+};
 
-  const Query = new duckfficer.Schema({
-    type: 'Query'
+const Query$1 = new duckfficer.Schema({
+  type: 'Query'
+});
+
+function handler$4 ({ DuckStorage, duckRack }) {
+  storeKey[duckRack.name] = {};
+  duckRack.hook('before', 'create', ({ entry }) => {
+    storeKey[duckRack.name][entry._id] = {
+      ...entry,
+      _id: entry._id.toString()
+    };
   });
 
-  return ({ duckRack }) => {
-    storeKey[duckRack.name] = {};
-    duckRack.hook('before', 'create', ({ entry }) => {
-      storeKey[duckRack.name][entry._id] = entry;
-    });
+  duckRack.hook('before', 'update', ({ entry, result }) => {
+    storeKey[duckRack.name][entry._id] = entry;
+    result.push(entry);
+  });
 
-    duckRack.hook('before', 'update', ({ entry, result }) => {
-      storeKey[duckRack.name][entry._id] = entry;
-      result.push(entry);
-    });
+  duckRack.hook('before', 'deleteById', ({ _id, result }) => {
+    const foundEntry = storeKey[duckRack.name][_id];
 
-    duckRack.hook('before', 'deleteById', ({ _id, result }) => {
-      const foundEntry = storeKey[duckRack.name][_id];
+    if (foundEntry) {
+      delete storeKey[duckRack.name][_id];
+      result.push(foundEntry);
+    }
+  });
+  duckRack.hook('before', 'list', async ({ query, result, sort }) => {
+    const getResults = async () => {
+      const results = runQuery(Object.values(storeKey[duckRack.name]), await Query$1.parse(query));
 
-      if (foundEntry) {
-        delete storeKey[duckRack.name][_id];
-        result.push(foundEntry);
+      if (sort) {
+        return sortArray(results, sort)
       }
-    });
-    duckRack.hook('before', 'list', async ({ query, result, sort }) => {
-      const getResults = async () => {
-        const results = runQuery(Object.values(storeKey[duckRack.name]), await Query.parse(query));
 
-        if (sort) {
-          return sortArray(results, sort)
-        }
+      return results
+    };
 
-        return results
+    const results = await getResults();
+    results.length > 0 && result.push(...results);
+  });
+  duckRack.hook('before', 'findOneById', async ({ _id, _v, result }) => {
+    if (result.length === 0) {
+      const queryInput = {
+        _id: typeof _id === 'string' ? _id : _id.toString()
       };
 
-      const results = await getResults();
-      results.length > 0 && result.push(...results);
-    });
-    duckRack.hook('before', 'findOneById', async ({ _id, _v, result }) => {
-      if (result.length === 0) {
-        const queryInput = {
-          _id: _id
-        };
-
-        if (_v) {
-          queryInput._v = _v;
-        }
-
-        const theQuery = await Query.parse(queryInput);
-        const entry = runQuery(Object.values(storeKey[duckRack.name]), theQuery)[0];
-        if (entry) {
-          // cloneDeep prevents the local entry being mutated
-          result.push(cloneDeep__default['default'](entry));
-        }
+      if (_v) {
+        queryInput._v = _v;
       }
-    });
-  }
+
+      const theQuery = await Query$1.parse(queryInput);
+      const entry = runQuery(Object.values(storeKey[duckRack.name]), theQuery)[0];
+      if (entry) {
+        // cloneDeep prevents the local entry being mutated
+        result.push(cloneDeep__default['default'](entry));
+      }
+    }
+  });
 }
 
 var InMemory = /*#__PURE__*/Object.freeze({
@@ -1932,7 +1935,6 @@ const name = 'state-logger';
 async function handler ({ DuckStorage, duckRack }) {
   await registerStateLoggerCollection(DuckStorage);
 
-  console.log('duckRack.name', duckRack.name);
   if (duckRack.name === STATE_LOGGER_COLLECTION) {
     return
   }
@@ -2164,6 +2166,8 @@ class DuckStorageClass extends events.EventEmitter {
   getRackByName (rackName) {
     return this.store[rackName]
   }
+
+  // todo: destroy method: closes db connections, garbage collects unused objects
 }
 
 /**

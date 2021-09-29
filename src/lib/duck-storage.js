@@ -205,4 +205,6 @@ export class DuckStorageClass extends EventEmitter {
   getRackByName (rackName) {
     return this.store[rackName]
   }
+
+  // todo: destroy method: closes db connections, garbage collects unused objects
 }

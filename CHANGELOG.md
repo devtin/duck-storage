@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.33](https://github.com/devtin/duck-storage/compare/v0.0.31...v0.0.33) (2021-09-29)
+
 ### [0.0.31](https://github.com/devtin/duck-storage/compare/v0.0.30...v0.0.31) (2021-08-07)
 
 ### [0.0.30](https://github.com/devtin/duck-storage/compare/v0.0.29...v0.0.30) (2021-07-23)

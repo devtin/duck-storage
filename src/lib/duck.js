@@ -106,14 +106,22 @@ export class Duck extends EventEmitter {
 
     await Utils.PromiseEach(this.schema.paths, async path => {
       const def = this.schema.schemaAtPath(path).settings.default
-      const defaultValue = defaultValues[path] || (def ? (typeof def === 'function' ? await def() : def) : undefined)
+
+      const getDefaultValue = async () => {
+        if (defaultValues[path] !== undefined) {
+          return defaultValues[path]
+        }
+
+        return def !== undefined ? (typeof def === 'function' ? await def() : def) : undefined
+      }
+
+      const defaultValue = await getDefaultValue()
 
       if (defaultValue !== undefined || deeplyRequired(this.schema, path)) {
         set(data, path, defaultValue)
       }
     })
 
-    // const
     const theModelProxy = new DeepProxy(data, {
       get (target, key) {
         if (typeof key !== 'string') {

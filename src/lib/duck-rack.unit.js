@@ -369,15 +369,10 @@ test.only('loads references of ducks in other racks', async t => {
   // console.log({ customer })
   // console.log(CustomerModel.schema.parse(customer))
 
-  try {
-    await OrderModel.schema.parse({
-      customer,
-      amount: 100
-    })
-  } catch (err) {
-    console.log('\n\nERROR\n\n', err)
-    throw err
-  }
+  await OrderModel.schema.parse({
+    customer,
+    amount: 100
+  })
 
   const order = await OrderRack.create({
     customer,

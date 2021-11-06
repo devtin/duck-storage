@@ -509,7 +509,11 @@ export class DuckRack extends EventEmitter {
     await this.trigger('before', 'list', { query: queryInput, sort, skip, limit, raw, state, result })
     await this.trigger('after', 'list', { query: queryInput, sort, skip, limit, raw, state, result })
 
-    return raw ? result : Promise.map(result, this.consolidateDoc(state, { virtuals }))
+    if (raw) {
+      return result
+    }
+
+    return Promise.map(result, this.consolidateDoc(state, { virtuals }))
   }
 
   static validateEntryVersion (newEntry, oldEntry) {

@@ -1622,7 +1622,11 @@ class DuckRack extends events.EventEmitter {
     await this.trigger('before', 'list', { query: queryInput, sort, skip, limit, raw, state, result });
     await this.trigger('after', 'list', { query: queryInput, sort, skip, limit, raw, state, result });
 
-    return raw ? result : Promise__default['default'].map(result, this.consolidateDoc(state, { virtuals }))
+    if (raw) {
+      return result
+    }
+
+    return Promise__default['default'].map(result, this.consolidateDoc(state, { virtuals }))
   }
 
   static validateEntryVersion (newEntry, oldEntry) {
@@ -1744,14 +1748,22 @@ class Duck extends events.EventEmitter {
 
     await duckfficer.Utils.PromiseEach(this.schema.paths, async path => {
       const def = this.schema.schemaAtPath(path).settings.default;
-      const defaultValue = defaultValues[path] || (def ? (typeof def === 'function' ? await def() : def) : undefined);
+
+      const getDefaultValue = async () => {
+        if (defaultValues[path] !== undefined) {
+          return defaultValues[path]
+        }
+
+        return def !== undefined ? (typeof def === 'function' ? await def() : def) : undefined
+      };
+
+      const defaultValue = await getDefaultValue();
 
       if (defaultValue !== undefined || deeplyRequired(this.schema, path)) {
         set__default['default'](data, path, defaultValue);
       }
     });
 
-    // const
     const theModelProxy = new proxyDeep(data, {
       get (target, key) {
         if (typeof key !== 'string') {
